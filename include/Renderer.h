@@ -4,7 +4,9 @@
 #include <vector>
 #include <string>
 #include <GL/glew.h>
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
+#endif
 
 class Renderer
 {
@@ -45,7 +47,9 @@ private:
     void* m_surface = nullptr;
     void* m_context = nullptr;
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
     HWND m_hwnd = nullptr;
     HDC m_hdc = nullptr;
     HGLRC m_glrc = nullptr;
+#endif
 };

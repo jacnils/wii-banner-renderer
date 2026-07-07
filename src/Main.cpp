@@ -21,7 +21,9 @@ misrepresented as being the original software.
 3. This notice may not be removed or altered from any source
 distribution.
 */
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
+#endif
 
 #include <GL/glew.h>
 #include <iostream>
@@ -61,7 +63,15 @@ int main(int argc, char** argv) {
     auto sfx_length = banner.GetSound()->GetDurationSeconds();
     bool save_frames = false;
 
-    FILE* ffmpeg = _popen(
+#ifdef _WIN32
+#define POPEN _popen
+#define PCLOSE _pclose
+#else
+#define POPEN popen
+#define PCLOSE pclose
+#endif
+
+    FILE* ffmpeg = POPEN(
         "ffmpeg -y "
         "-f rawvideo "
         "-loglevel error "
@@ -76,8 +86,12 @@ int main(int argc, char** argv) {
         "-c:a aac "
         "-shortest "
         "output.mp4",
-        "wb"
+        "w"
     );
+
+#ifdef _WIN32
+    _setmode(_fileno(ffmpeg), _O_BINARY);
+#endif
 
     for (int i = 0; i < fps * sfx_length; i++) {
     	renderer.BeginFrame();

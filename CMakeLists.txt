@@ -34,10 +34,28 @@ add_executable(wii-banner-renderer
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 
-target_link_libraries(wii-banner-renderer 
-	GLEW::GLEW
-	OpenGL::GL
-	#libEGL
-	opengl32
-	gdi32
+target_link_libraries(wii-banner-renderer
+    PRIVATE
+        GLEW::GLEW
+        OpenGL::GL
 )
+
+if (WIN32)
+    target_link_libraries(wii-banner-renderer PRIVATE opengl32 gdi32)
+endif()
+
+
+if (UNIX)
+	find_library(EGL_LIBRARY NAMES EGL)
+        find_path(EGL_INCLUDE_DIR NAMES EGL/egl.h)
+
+        if (EGL_LIBRARY AND EGL_INCLUDE_DIR)
+            add_library(EGL::EGL UNKNOWN IMPORTED)
+            set_target_properties(EGL::EGL PROPERTIES
+                IMPORTED_LOCATION ${EGL_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES ${EGL_INCLUDE_DIR}
+            )
+        endif()
+
+	target_link_libraries(wii-banner-renderer PRIVATE EGL::EGL)
+endif()
