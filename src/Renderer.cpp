@@ -10,7 +10,9 @@
 #endif
 
 #ifdef GL_LINUX
+#define EGL_EGLEXT_PROTOTYPES
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 #endif
 
 #include <algorithm>
@@ -54,7 +56,7 @@ void Renderer::CreateContext()
 	wc.style = CS_OWNDC;
 	wc.lpfnWndProc = DefWindowProc;
 	wc.hInstance = GetModuleHandle(nullptr);
-	wc.lpszClassName = "DummyGLWindow";
+	wc.lpszClassName = "kek";
 
 
 	RegisterClass(&wc);
@@ -130,9 +132,42 @@ void Renderer::DestroyContext()
 	m_hwnd = nullptr;
 }
 #else
+EGLDisplay CreateEGLDisplay()
+{
+    PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT =
+        (PFNEGLQUERYDEVICESEXTPROC)
+        eglGetProcAddress("eglQueryDevicesEXT");
+
+    PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT =
+        (PFNEGLGETPLATFORMDISPLAYEXTPROC)
+        eglGetProcAddress("eglGetPlatformDisplayEXT");
+
+    if (eglQueryDevicesEXT && eglGetPlatformDisplayEXT)
+    {
+        EGLDeviceEXT devices[8];
+        EGLint numDevices = 0;
+
+        if (eglQueryDevicesEXT(8, devices, &numDevices) &&
+            numDevices > 0)
+        {
+            return eglGetPlatformDisplayEXT(
+                EGL_PLATFORM_DEVICE_EXT,
+                devices[0],
+                nullptr
+            );
+        }
+    }
+
+    return eglGetPlatformDisplay(
+        EGL_PLATFORM_SURFACELESS_MESA,
+        EGL_DEFAULT_DISPLAY,
+        nullptr
+    );
+}
 void Renderer::CreateContext()
 {
-    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    EGLDisplay display = CreateEGLDisplay();
+
     if (display == EGL_NO_DISPLAY)
         throw std::runtime_error("eglGetDisplay failed");
 
@@ -175,9 +210,9 @@ void Renderer::CreateContext()
     if (!eglMakeCurrent(display, surface, surface, context))
         throw std::runtime_error("eglMakeCurrent failed");
 
-    GLenum err = glewInit();
-    if (err != GLEW_OK)
-        throw std::runtime_error((const char*)glewGetErrorString(err));
+    //GLenum err = glewInit();
+    //if (err != GLEW_OK)
+    //    throw std::runtime_error((const char*)glewGetErrorString(err));
 
     /*
     printf("Vendor: %s\n", glGetString(GL_VENDOR));
