@@ -281,26 +281,26 @@ Layout* Banner::LoadLayout(const std::string& lyt_name, std::streamoff offset, V
 	FrameNumber length_start = 0, length_loop = 0;
 
 	auto const brlan_start_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Start.brlan");
-	size_t brlan_loop_offset = 0;
 
-	//std::cout << lyt_name + "_Start.brlan offset is: " << brlan_start_offset << '\n';
-	if (brlan_start_offset)
-	{
+	// alt. start file
+	if (!brlan_start_offset) {
+		bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_In.brlan");
+	}
+
+	if (brlan_start_offset) {
 		file.seekg(brlan_start_offset, std::ios::beg);
 		length_start = LoadAnimators(file, *layout, 0);
+	}
 
-		// banner uses 2 brlan files, a starting one and a looping one
+	auto brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + ".brlan");
+	if (!brlan_loop_offset) {
 		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Loop.brlan");
 	}
-	else
-	{
-		// banner uses a single repeating brlan
-		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + ".brlan");
+	if (!brlan_loop_offset) {
+		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Rso0.brlan");
 	}
 
-	//std::cout << lyt_name + "[_Loop].brlan offset is: " << brlan_loop_offset << '\n';
-	if (brlan_loop_offset)
-	{
+	if (brlan_loop_offset) {
 		file.seekg(brlan_loop_offset, std::ios::beg);
 		length_loop = LoadAnimators(file, *layout, 1);
 	}
