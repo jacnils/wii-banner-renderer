@@ -52,6 +52,10 @@ if (WIN32)
         GIT_REPOSITORY https://github.com/Perlmint/glew-cmake.git
         GIT_TAG master
     )
+    
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(glew-cmake_BUILD_STATIC ON CACHE BOOL "" FORCE)
 
     FetchContent_MakeAvailable(glew)
 
