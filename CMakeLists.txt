@@ -1,64 +1,89 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.21)
 project(wii-banner-renderer)
 
-set(CMAKE_CXX_FLAGS "-w -std=c++23")
+set(CMAKE_CXX_STANDARD 23)
+
+add_compile_options(-w)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/old)
 
-add_executable(wii-banner-renderer 
-	# junk from dolphin emulator, TODO: remove this
-	src/old/Blob.cpp
-	src/old/CDUtils.cpp
-	src/old/FileBlob.cpp
-	src/old/FileHandlerARC.cpp
-	src/old/TextureDecoder.cpp
+add_executable(wii-banner-renderer
+    src/old/Blob.cpp
+    src/old/CDUtils.cpp
+    src/old/FileBlob.cpp
+    src/old/FileHandlerARC.cpp
+    src/old/TextureDecoder.cpp
 
-	src/Animator.cpp
-	src/Banner.cpp
-	src/Endian.cpp
-	src/Font.cpp
-	src/Layout.cpp
-	src/Main.cpp
-	src/Material.cpp
-	src/Pane.cpp
-	src/Picture.cpp
-	src/Sound.cpp
-	src/Textbox.cpp
-	src/Texture.cpp
-	src/Window.cpp
-	src/WrapGx.cpp
-	src/Renderer.cpp
-	src/Wad.cpp
+    src/Animator.cpp
+    src/Banner.cpp
+    src/Endian.cpp
+    src/Font.cpp
+    src/Layout.cpp
+    src/Main.cpp
+    src/Material.cpp
+    src/Pane.cpp
+    src/Picture.cpp
+    src/Sound.cpp
+    src/Textbox.cpp
+    src/Texture.cpp
+    src/Window.cpp
+    src/WrapGx.cpp
+    src/Renderer.cpp
+    src/Wad.cpp
 )
 
-find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 target_link_libraries(wii-banner-renderer
-    PRIVATE
-        GLEW::GLEW
-        OpenGL::GL
-		OpenSSL::SSL
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 if (WIN32)
-    target_link_libraries(wii-banner-renderer PRIVATE opengl32 gdi32)
+    if (MINGW)
+        target_link_options(wii-banner-renderer PRIVATE
+            -static
+            -static-libgcc
+            -static-libstdc++
+        )
+    endif()
+
+    include(FetchContent)
+
+    FetchContent_Declare(
+        glew
+        GIT_REPOSITORY https://github.com/Perlmint/glew-cmake.git
+        GIT_TAG master
+    )
+
+    FetchContent_MakeAvailable(glew)
+
+    target_compile_definitions(wii-banner-renderer PRIVATE GLEW_STATIC)
+
+    target_link_libraries(wii-banner-renderer
+        PRIVATE
+            libglew_static
+            opengl32
+            gdi32
+    )
+
+    add_custom_command(TARGET wii-banner-renderer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:wii-banner-renderer>
+            $<TARGET_FILE_DIR:wii-banner-renderer>
+        COMMAND_EXPAND_LISTS
+    )
+
 endif()
-
-
 if (UNIX)
-	find_library(EGL_LIBRARY NAMES EGL)
-        find_path(EGL_INCLUDE_DIR NAMES EGL/egl.h)
+    find_library(EGL_LIBRARY NAMES EGL REQUIRED)
 
-        if (EGL_LIBRARY AND EGL_INCLUDE_DIR)
-            add_library(EGL::EGL UNKNOWN IMPORTED)
-            set_target_properties(EGL::EGL PROPERTIES
-                IMPORTED_LOCATION ${EGL_LIBRARY}
-                INTERFACE_INCLUDE_DIRECTORIES ${EGL_INCLUDE_DIR}
-            )
-        endif()
+    target_link_libraries(wii-banner-renderer
+        PRIVATE
+            OpenGL::GL
+            ${EGL_LIBRARY}
+    )
 
-	target_link_libraries(wii-banner-renderer PRIVATE EGL::EGL)
 endif()

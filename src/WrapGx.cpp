@@ -21,9 +21,12 @@ misrepresented as being the original software.
 distribution.
 */
 
+#ifdef _WIN32
+#define GLEW_STATIC
+#include <windows.h>
+#endif
 #include <GL/glew.h>
 #include <GL/glu.h>
-#include <GL/gl.h>
 
 #include <iostream>
 #include <map>
