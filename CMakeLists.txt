@@ -71,10 +71,16 @@ if (WIN32)
         "${CMAKE_PREFIX_PATH}/bin/libcrypto-*.dll"
     )
 
+    execute_process(
+        COMMAND bash -lc "cygpath -w $MINGW_PREFIX"
+        OUTPUT_VARIABLE MINGW_PREFIX_WIN
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
     add_custom_command(TARGET wii-banner-renderer POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "C:/msys64/mingw64/bin/libssl-3-x64.dll"
-            "C:/msys64/mingw64/bin/libcrypto-3-x64.dll"
+            "${MINGW_PREFIX_WIN}/bin/libssl-3-x64.dll"
+            "${MINGW_PREFIX_WIN}/bin/libcrypto-3-x64.dll"
             $<TARGET_FILE_DIR:wii-banner-renderer>
     )
 endif()
