@@ -66,11 +66,15 @@ if (WIN32)
             OpenSSL::Crypto
     )
 
+    file(GLOB OPENSSL_DLLS
+        "${CMAKE_PREFIX_PATH}/bin/libssl-*.dll"
+        "${CMAKE_PREFIX_PATH}/bin/libcrypto-*.dll"
+    )
+
     add_custom_command(TARGET wii-banner-renderer POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:wii-banner-renderer>
+            ${OPENSSL_DLLS}
             $<TARGET_FILE_DIR:wii-banner-renderer>
-        COMMAND_EXPAND_LISTS
     )
 
 endif()
