@@ -1,0 +1,65 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-make
+          mingw-w64-x86_64-glew
+          mingw-w64-x86_64-opengl
+          
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+        cmake --build .
+
+
+    - name: Download FFmpeg
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+        Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+
+        $ffmpegExe = Get-ChildItem -Recurse -Filter ffmpeg.exe ffmpeg | Select-Object -First 1
+        Copy-Item $ffmpegExe.FullName build\ffmpeg.exe
+
+    - name: Create ZIP
+      shell: powershell
+      run: |
+        Compress-Archive -Path build\wii-banner-renderer.exe, build\ffmpeg.exe -DestinationPath release.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: release.zip
+
+    - name: Create Pre-release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: nightly-${{ github.run_number }}
+        name: Nightly Build
+        prerelease: true
+        files: release.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
