@@ -31,25 +31,43 @@ distribution.
 #include <GL/glew.h>
 #include <iostream>
 #include <filesystem>
+#include <sstream>
 
 #include "Banner.h"
 #include "Types.h"
 #include "Renderer.h"
+#include "Wad.h"
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr>\n";
+        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad>\n";
         return EXIT_FAILURE;
     }
 
     if (!std::filesystem::is_regular_file(argv[1])) {
     	std::cerr << "Input file does not exist or cannot be read." << "\n";
-	return EXIT_FAILURE;
+		return EXIT_FAILURE;
     }
+
+	std::string opening = argv[1];
+	if (std::filesystem::path(argv[1]).extension() == ".wad") {
+		std::ifstream in(argv[1], std::ios::binary);
+		if (!in) {
+			std::cerr << "Input file does not exist or cannot be read." << "\n";
+			return EXIT_FAILURE;
+		}
+		extract_wad(in, "tmp");
+		if (!std::filesystem::is_regular_file("tmp/00000000.app")) {
+			std::cerr << "Invalid/unsupported input file. It is possible that it is structured differently.\n";
+			return EXIT_FAILURE;
+		}
+
+		opening = "tmp/00000000.app";
+	}
 
     Renderer renderer(1920, 1080);
 
-    WiiBanner::Banner banner(argv[1]);
+    WiiBanner::Banner banner(opening);
 
     banner.LoadBanner();
     banner.LoadSound();
@@ -104,10 +122,11 @@ int main(int argc, char** argv) {
     		596.0f / 608.0f
 	);
 
-    	renderer.EndFrame();
+
+    renderer.EndFrame();
 
 	if (save_frames) {
-    		char filename[64];
+		char filename[64];
 		sprintf(filename, "output-%04d.png", i);
 
 		renderer.SavePNG(filename, 1920, 1080);
@@ -117,8 +136,11 @@ int main(int argc, char** argv) {
     	banner.GetBanner()->AdvanceFrame();
     }
 
-
     banner.UnloadBanner();
+
+	if (std::filesystem::is_directory("tmp")) {
+		std::filesystem::remove_all("tmp");
+	}
 
     return 0;
 }

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 project(wii-banner-renderer)
 
-set(CMAKE_CXX_FLAGS "-w -std=c++17")
+set(CMAKE_CXX_FLAGS "-w -std=c++23")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/old)
@@ -29,15 +29,18 @@ add_executable(wii-banner-renderer
 	src/Window.cpp
 	src/WrapGx.cpp
 	src/Renderer.cpp
+	src/Wad.cpp
 )
 
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 target_link_libraries(wii-banner-renderer
     PRIVATE
         GLEW::GLEW
         OpenGL::GL
+		OpenSSL::SSL
 )
 
 if (WIN32)
