@@ -24,6 +24,7 @@ jobs:
           mingw-w64-x86_64-make
           mingw-w64-x86_64-glew
           mingw-w64-x86_64-opengl
+          mingw-w64-x86_64-openssl
           
     - name: Build
       shell: msys2 {0}
@@ -46,7 +47,7 @@ jobs:
     - name: Create ZIP
       shell: powershell
       run: |
-        Compress-Archive -Path build\wii-banner-renderer.exe, build\ffmpeg.exe -DestinationPath release.zip
+        Compress-Archive -Path build\wii-banner-renderer.exe, build\ffmpeg.exe, build\*.dll -DestinationPath release.zip
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
