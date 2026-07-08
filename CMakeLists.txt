@@ -73,10 +73,10 @@ if (WIN32)
 
     add_custom_command(TARGET wii-banner-renderer POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${OPENSSL_DLLS}
+            "C:/msys64/mingw64/bin/libssl-3-x64.dll"
+            "C:/msys64/mingw64/bin/libcrypto-3-x64.dll"
             $<TARGET_FILE_DIR:wii-banner-renderer>
     )
-
 endif()
 if (UNIX)
     find_library(EGL_LIBRARY NAMES EGL REQUIRED)
