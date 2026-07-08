@@ -36,11 +36,6 @@ add_executable(wii-banner-renderer
 find_package(OpenGL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-target_link_libraries(wii-banner-renderer
-    OpenSSL::SSL
-    OpenSSL::Crypto
-)
-
 if (WIN32)
     if (MINGW)
         target_link_options(wii-banner-renderer PRIVATE
@@ -67,6 +62,8 @@ if (WIN32)
             libglew_static
             opengl32
             gdi32
+	    OpenSSL::SSL
+            OpenSSL::Crypto
     )
 
     add_custom_command(TARGET wii-banner-renderer POST_BUILD
@@ -84,6 +81,8 @@ if (UNIX)
         PRIVATE
             OpenGL::GL
             ${EGL_LIBRARY}
+            OpenSSL::SSL
+            OpenSSL::Crypto
     )
 
 endif()
