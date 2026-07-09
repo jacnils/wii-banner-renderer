@@ -23,37 +23,73 @@ distribution.
 */
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <io.h>
 #include <fcntl.h>
 #endif
 
-#include <GL/glew.h>
 #include <iostream>
 #include <filesystem>
-#include <sstream>
 
 #include "Banner.h"
-#include "Types.h"
 #include "Renderer.h"
 #include "Wad.h"
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad>\n";
-        return EXIT_FAILURE;
-    }
+struct Settings {
+	int fps = 60; // fps to render at
+	int minimum_length = 10; // min seconds
+	int maximum_length = -1; // max seconds
+	bool save_frames = false; // save frames? (wastes your time, useful for debugging)
+	int frames_to_save = -1; // -1 = save all frames iterated through
+};
 
-    if (!std::filesystem::is_regular_file(argv[1])) {
-    	std::cerr << "Input file does not exist or cannot be read." << "\n";
-		return EXIT_FAILURE;
-    }
+// wrapper for opening processes
+struct ProcPtr {
+	ProcPtr(const std::string& params, const std::string& mode = "w") {
+		ptr =
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+		_popen(params.c_str(), mode.c_str());
+#else
+			popen(params.c_str(), mode.c_str());
+#endif
 
-	std::string opening = argv[1];
-	if (std::filesystem::path(argv[1]).extension() == ".wad") {
-		std::ifstream in(argv[1], std::ios::binary);
+		if (!ptr) {
+			throw std::runtime_error{"failed to popen()"};
+		}
+
+		_setmode(_fileno(ptr), _O_BINARY);
+
+	}
+	~ProcPtr() {
+		if (ptr)
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+			_pclose(ptr);
+#else
+				pclose(ptr);
+#endif
+	}
+
+	[[nodiscard]] FILE* get() const {
+		if (!ptr) {
+			throw std::runtime_error{"uninitialized"};
+		}
+		return ptr;
+	}
+
+private:
+	FILE* ptr{nullptr};
+
+};
+
+int process(const std::string& input_opening, Settings settings = {}) {
+	std::string opening = input_opening;
+
+	std::cout << "Processing: " << opening << "\n";
+
+	if (std::filesystem::path(opening).extension() == ".wad") {
+		std::ifstream in(opening, std::ios::binary);
 		if (!in) {
-			std::cerr << "Input file does not exist or cannot be read." << "\n";
+			std::cerr << "Input file does not exist or cannot be read: " << input_opening << "\n";
 			return EXIT_FAILURE;
 		}
 		extract_wad(in, "tmp");
@@ -63,6 +99,12 @@ int main(int argc, char** argv) {
 		}
 
 		opening = "tmp/00000000.app";
+	}
+
+	std::string base_filename = std::filesystem::path(input_opening).filename().string();
+	auto ext = base_filename.find_last_of('.');
+	if (ext != std::string::npos) {
+		base_filename = base_filename.substr(0, ext);
 	}
 
     Renderer renderer(1920, 1080);
@@ -78,61 +120,52 @@ int main(int argc, char** argv) {
     	throw std::runtime_error{"GetSound() failed"};
     }
 
-    banner.GetSound()->WriteWAV("output.wav");
+    banner.GetSound()->WriteWAV(base_filename + ".wav");
 
-    const int fps = 60;
-    auto sfx_length = banner.GetSound()->GetDurationSeconds();
-    bool save_frames = false;
+    int sfx_length = static_cast<int>(banner.GetSound()->GetDurationSeconds());
 
-#ifdef _WIN32
-#define POPEN _popen
-#define PCLOSE _pclose
-#else
-#define POPEN popen
-#define PCLOSE pclose
-#endif
+	ProcPtr ffmpeg{
+		"ffmpeg -y "
+	"-f rawvideo "
+	"-loglevel error "
+	"-pixel_format rgba "
+	"-video_size 1920x1080 "
+	"-framerate " + std::to_string(settings.fps) + " "
+	"-i - "
+	"-i " + base_filename + ".wav "
+	"-vf \"crop=933:403:970:545,scale=trunc(iw/2)*2:trunc(ih/2)*2\" "
+	"-c:v libx264 "
+	"-pix_fmt yuv420p "
+	"-c:a aac "
+	"-shortest "
+	+ base_filename + ".mp4", "w"};
 
-    FILE* ffmpeg = POPEN(
-        "ffmpeg -y "
-        "-f rawvideo "
-        "-loglevel error "
-        "-pixel_format rgba "
-        "-video_size 1920x1080 "
-        "-framerate 60 "
-        "-i - "
-        "-i output.wav "
-        "-vf \"crop=933:403:970:545,scale=trunc(iw/2)*2:trunc(ih/2)*2\" "
-        "-c:v libx264 "
-        "-pix_fmt yuv420p "
-        "-c:a aac "
-        "-shortest "
-        "output.mp4",
-        "w"
-    );
+	int runtime = sfx_length;
+	if (settings.maximum_length >= 0) {
+		runtime = std::min(settings.maximum_length, runtime);
+	}
+	if (settings.minimum_length >= 0) {
+		runtime = std::max(settings.minimum_length, runtime);
+	}
 
-#ifdef _WIN32
-    _setmode(_fileno(ffmpeg), _O_BINARY);
-#endif
-
-    for (int i = 0; i < fps * sfx_length; i++) {
+    for (int i = 0; i < settings.fps * runtime; i++) {
     	renderer.BeginFrame();
-    	
-	banner.GetBanner()->Render(
+
+		banner.GetBanner()->Render(
     		16.0f / 9.0f,
     		596.0f / 608.0f
-	);
+		);
 
+		renderer.EndFrame();
 
-    renderer.EndFrame();
+		if (settings.save_frames && settings.frames_to_save <= i && settings.frames_to_save >= 0) {
+			char filename[64];
+			sprintf(filename, "output-%04d.png", i);
 
-	if (save_frames) {
-		char filename[64];
-		sprintf(filename, "output-%04d.png", i);
+			renderer.SavePNG(filename, 1920, 1080);
+  		}
 
-		renderer.SavePNG(filename, 1920, 1080);
-  	}
-	
-  	renderer.ReadPixelsTo(ffmpeg);
+  		renderer.ReadPixelsTo(ffmpeg.get());
     	banner.GetBanner()->AdvanceFrame();
     }
 
@@ -142,5 +175,128 @@ int main(int argc, char** argv) {
 		std::filesystem::remove_all("tmp");
 	}
 
+	std::cout << "Processed " << input_opening << "\n";
+
     return 0;
+}
+
+static std::string trim(const std::string& s) {
+	const char* whitespace = " \t\n\r\f\v";
+
+	size_t start = s.find_first_not_of(whitespace);
+	if (start == std::string::npos)
+		return "";
+
+	size_t end = s.find_last_not_of(whitespace);
+	return s.substr(start, end - start + 1);
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-min int|-max int|-s int\n";
+        return EXIT_FAILURE;
+    }
+
+	Settings settings{};
+	std::vector<std::string> openings;
+
+	for (int i = 1; i < argc; i++) {
+		std::string arg = argv[i];
+
+		if (arg == "-w") {
+			std::string opening;
+			std::cout << "input file(s) (comma split): " << std::flush;
+			std::getline(std::cin, opening);
+
+			std::stringstream ss(opening);
+			std::string item;
+
+			while (std::getline(ss, item, ',')) {
+				item = trim(item);
+				if (!item.empty())
+					openings.emplace_back(item);
+			}
+		}
+
+		if (arg == "-s") {
+			settings.save_frames = true;
+
+			if (i + 1 < argc) {
+				std::string sec_arg = argv[i + 1];
+
+				try {
+					size_t pos = 0;
+					int value = std::stoi(sec_arg, &pos);
+
+					if (pos == sec_arg.size()) {
+						settings.frames_to_save = value;
+						++i;
+					}
+				} catch (...) {
+					continue;
+				}
+			}
+		}
+
+		if (arg == "-min") {
+			if (i + 1 < argc) {
+				std::string sec_arg = argv[i + 1];
+
+				try {
+					size_t pos = 0;
+					int value = std::stoi(sec_arg, &pos);
+
+					if (pos == sec_arg.size()) { // ensure entire string is integers
+						settings.minimum_length = value;
+					} else {
+						std::cerr << "invalid integer passed\n";
+						return EXIT_FAILURE;
+					}
+				} catch (std::exception&) {
+					std::cerr << "-min flag requires an integer\n";
+				}
+			} else {
+				std::cerr << "-min flag requires an integer\n";
+				return EXIT_FAILURE;
+			}
+		}
+
+		if (arg == "-max") {
+			if (i + 1 < argc) {
+				std::string sec_arg = argv[i + 1];
+
+				try {
+					size_t pos = 0;
+					int value = std::stoi(sec_arg, &pos);
+
+					if (pos == sec_arg.size()) { // ensure entire string is integers
+						settings.maximum_length = value;
+					} else {
+						std::cerr << "invalid integer passed\n";
+						return EXIT_FAILURE;
+					}
+				} catch (std::exception&) {
+					std::cerr << "-max flag requires an integer\n";
+				}
+			} else {
+				std::cerr << "-max flag requires an integer\n";
+				return EXIT_FAILURE;
+			}
+		}
+
+		if (std::filesystem::is_regular_file(arg)) {
+			openings.emplace_back(arg);
+		}
+	}
+
+	int ret_val = EXIT_SUCCESS;
+	for (const auto& it : openings) {
+		auto ret = process(it, settings);
+
+		if (ret != EXIT_SUCCESS) {
+			ret_val = EXIT_FAILURE;
+		}
+	}
+
+	return ret_val;
 }

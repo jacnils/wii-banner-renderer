@@ -420,7 +420,7 @@ void Sound::WritePCMAsWAV(const std::string& path,
 
 
 void Sound::WriteWAV(const std::string& path) {
-    std::cout << "called" << std::flush;
+    //std::cout << "called" << std::flush;
     if (format == FORMAT_WAV) {
         std::ofstream out(path, std::ios::binary);
         out.write((char*)rawData.data(), rawData.size());
