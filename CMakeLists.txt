@@ -76,17 +76,26 @@ if (WIN32)
     )
 
     execute_process(
-        COMMAND bash -lc "cygpath -w $MINGW_PREFIX"
-        OUTPUT_VARIABLE MINGW_PREFIX_WIN
-        OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND bash -lc "cygpath -w $MINGW_PREFIX"
+            OUTPUT_VARIABLE MINGW_PREFIX_WIN
+            OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 
-    add_custom_command(TARGET wii-banner-renderer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MINGW_PREFIX_WIN}/bin/libssl-3-x64.dll"
-            "${MINGW_PREFIX_WIN}/bin/libcrypto-3-x64.dll"
-            $<TARGET_FILE_DIR:wii-banner-renderer>
-    )
+    if(NOT MINGW_PREFIX_WIN OR MINGW_PREFIX_WIN STREQUAL "")
+        message(STATUS "MINGW_PREFIX not found, using fallback path")
+        set(MINGW_PREFIX_WIN "C:/msys64/mingw64")
+    endif()
+
+    if(EXISTS "${MINGW_PREFIX_WIN}/bin/libssl-3-x64.dll")
+        add_custom_command(TARGET wii-banner-renderer POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${MINGW_PREFIX_WIN}/bin/libssl-3-x64.dll"
+                "${MINGW_PREFIX_WIN}/bin/libcrypto-3-x64.dll"
+                $<TARGET_FILE_DIR:wii-banner-renderer>
+        )
+    else()
+        message(WARNING "OpenSSL DLLs not found in ${MINGW_PREFIX_WIN}/bin")
+    endif()
 endif()
 if (UNIX)
     find_library(EGL_LIBRARY NAMES EGL REQUIRED)
