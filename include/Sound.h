@@ -22,12 +22,11 @@ misrepresented as being the original software.
 distribution.
 */
 
+#pragma once
+
 #include <string>
 #include <vector>
 #include <cstdint>
-
-#ifndef WII_BNR_SOUND_H_
-#define WII_BNR_SOUND_H_
 
 namespace WiiBanner
 {
@@ -44,20 +43,18 @@ class Sound
 	uint32_t loop_end = 0;
 	bool has_loop = false;
 
-	void WritePCMAsWAV(const std::string& path,
-                   const std::vector<int16_t>& samples,
-                   uint16_t channels,
-                   uint32_t sampleRate);
+	static void WritePCMAsWAV(const std::string& path,
+	                          const std::vector<int16_t>& samples,
+	                          uint16_t channels,
+	                          uint32_t sampleRate);
 public:
-	Sound() {}
+	Sound() = default;
 	~Sound() = default;
 
 	bool Load(std::istream& file);
 	void WriteWAV(const std::string& path);
 	void WriteWAVLooped(const std::string& path, double seconds);
-	double GetDurationSeconds() const;
+	[[nodiscard]] double GetDurationSeconds() const;
 };
 
 }
-
-#endif

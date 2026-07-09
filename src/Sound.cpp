@@ -132,11 +132,11 @@ struct BNS
 		else if (info.channel_count == 2)
 		{
 			// L, R
-			in.seekg(1 * sizeof(u32), in.cur);
+			in.seekg(1 * sizeof(u32), std::istream::cur);
 			in >> BE >> info.right_start;
-			in.seekg(2 * sizeof(u32), in.cur);
+			in.seekg(2 * sizeof(u32), std::istream::cur);
 			ReadBEArray(in, info.coefs[0], 16);
-			in.seekg(4 * sizeof(u32), in.cur);
+			in.seekg(4 * sizeof(u32), std::istream::cur);
 			ReadBEArray(in, info.coefs[1], 16);
 		}
 		else
@@ -144,7 +144,7 @@ struct BNS
 			std::cout << static_cast<int>(info.channel_count) << " channels unsupported!\n";
 		}
 
-		in.seekg(start + hdr.data_off, in.beg);
+		in.seekg(start + hdr.data_off, std::istream::beg);
 		in >> data.magic >> BE >> data.size;
 		// chop off the magic + size words
 		hdr.data_len = data.size -= 8;
@@ -158,13 +158,13 @@ struct BNS
 			std::cout << "sound.bin appears invalid\n";
 	}
 
-	u8  GetChannelsCount() const { return info.channel_count; }
-	u32 GetSamplesCount() const { return info.sample_count * GetChannelsCount(); }
-	u16 GetSampleRate() const { return info.sample_rate; }
-	u8 GetLoop() const {
+	[[nodiscard]] u8  GetChannelsCount() const { return info.channel_count; }
+	[[nodiscard]] u32 GetSamplesCount() const { return info.sample_count * GetChannelsCount(); }
+	[[nodiscard]] u16 GetSampleRate() const { return info.sample_rate; }
+	[[nodiscard]] u8 GetLoop() const {
 		return info.loop;
 	}
-	u32 GetLoopStart() const {
+	[[nodiscard]] u32 GetLoopStart() const {
 		return info.loop_start;
 	}
 
@@ -225,7 +225,7 @@ struct BNS
 
 		return pcm_pos;
 	}
-u32 DecodeSampleCountForChannel(u32 adpcm_start_pos, u32 adpcm_end_pos)
+static u32 DecodeSampleCountForChannel(u32 adpcm_start_pos, u32 adpcm_end_pos)
 {
     u32 count = 0;
     u32 adpcm_pos = adpcm_start_pos;
@@ -245,7 +245,7 @@ u32 DecodeSampleCountForChannel(u32 adpcm_start_pos, u32 adpcm_end_pos)
 
     return count;
 }
-u32 GetDecodedSampleCount()
+[[nodiscard]] u32 GetDecodedSampleCount() const
 {
     if (info.channel_count == 1)
     {
@@ -300,7 +300,7 @@ bool Sound::Load(std::istream& file)
         std::cout << "WAV detected\n";
 
         in >> LE >> file_len;
-        in.seekg(start, in.beg);
+        in.seekg(start, std::istream::beg);
 
         rawData.resize(file_len);
         in.read(reinterpret_cast<char *>(rawData.data()), file_len);
@@ -308,77 +308,76 @@ bool Sound::Load(std::istream& file)
         format = FORMAT_WAV;
         return true;
     }
-    else if (magic == BINARY_MAGIC_AIFF)
+    if (magic == BINARY_MAGIC_AIFF)
     {
-        std::cout << "AIFF detected\n";
+	    std::cout << "AIFF detected\n";
 
-        in >> BE >> file_len;
-        in.seekg(start, in.beg);
+	    in >> BE >> file_len;
+	    in.seekg(start, std::istream::beg);
 
-        rawData.resize(file_len);
-        in.read((char*)rawData.data(), file_len);
+	    rawData.resize(file_len);
+	    in.read(reinterpret_cast<char *>(rawData.data()), file_len);
 
-        format = FORMAT_AIFF;
-        return true;
+	    format = FORMAT_AIFF;
+	    return true;
     }
-else if (magic == BINARY_MAGIC_BNS)
-{
-    std::cout << "BNS detected\n";
+    if (magic == BINARY_MAGIC_BNS) {
+	    std::cout << "BNS detected\n";
 
-    format = FORMAT_BNS;
+	    format = FORMAT_BNS;
 
-    in.seekg(start, in.beg);
+	    in.seekg(start, std::istream::beg);
 
-    BNS bns_file;
+	    BNS bns_file;
 
-    std::cout << "Opening BNS...\n";
-    bns_file.Open(in);
-    std::cout << "BNS opened\n";
+	    std::cout << "Opening BNS...\n";
+	    bns_file.Open(in);
+	    std::cout << "BNS opened\n";
 
-	sampleCount = bns_file.GetSamplesCount();
-    uint16_t channels    = bns_file.GetChannelsCount();
-    uint32_t sampleRate  = bns_file.GetSampleRate();
-	loop_start = bns_file.GetLoopStart();
-	loop_end   = sampleCount;
-	has_loop   = bns_file.GetLoop();
+	    sampleCount = bns_file.GetSamplesCount();
+	    uint16_t channels    = bns_file.GetChannelsCount();
+	    uint32_t sampleRate  = bns_file.GetSampleRate();
+	    loop_start = bns_file.GetLoopStart();
+	    loop_end   = sampleCount;
+	    has_loop   = bns_file.GetLoop();
 
-    std::cout
-        << "samples=" << sampleCount
-        << " channels=" << channels
-        << " rate=" << sampleRate
-        << "\n";
+	    std::cout
+			    << "samples=" << sampleCount
+			    << " channels=" << channels
+			    << " rate=" << sampleRate
+			    << "\n";
 
-    if (sampleCount == 0 || channels == 0)
-    {
-        std::cout << "Invalid BNS\n";
-        return false;
+	    if (sampleCount == 0 || channels == 0)
+	    {
+		    std::cout << "Invalid BNS\n";
+		    return false;
+	    }
+
+	    std::cout << "Resizing PCM buffer\n";
+	    samples.resize(bns_file.GetDecodedSampleCount());
+
+	    std::cout << "Decoding PCM...\n";
+	    u32 written = bns_file.DecodeToPCM(samples.data());
+
+	    std::cout << "Allocated samples: " << samples.size() << "\n";
+	    std::cout << "Written samples: " << written << "\n";
+
+	    samples.resize(written);
+
+	    std::cout << "Decode complete\n";
+
+	    this->channels = channels;
+
+	    std::cout << "channels assigned\n";
+
+	    this->sampleRate = sampleRate;
+
+	    std::cout << "rate assigned\n";
+
+	    std::cout << "Returning true from Sound::Load\n";
+
+	    return true;
     }
-
-    std::cout << "Resizing PCM buffer\n";
-    samples.resize(bns_file.GetDecodedSampleCount());
-
-    std::cout << "Decoding PCM...\n";
-    u32 written = bns_file.DecodeToPCM(samples.data());
-
-    std::cout << "Allocated samples: " << samples.size() << "\n";
-    std::cout << "Written samples: " << written << "\n";
-    
-    samples.resize(written);
-
-    std::cout << "Decode complete\n";
-
-    this->channels = channels;
-
-std::cout << "channels assigned\n";
-
-    this->sampleRate = sampleRate;
-
-std::cout << "rate assigned\n";
-
-std::cout << "Returning true from Sound::Load\n";
-
-    return true;
-}
 
     std::cout << "Unknown format\n";
     return false;
@@ -425,7 +424,7 @@ void Sound::WriteWAV(const std::string& path) {
     //std::cout << "called" << std::flush;
     if (format == FORMAT_WAV) {
         std::ofstream out(path, std::ios::binary);
-        out.write((char*)rawData.data(), rawData.size());
+        out.write(reinterpret_cast<char *>(rawData.data()), rawData.size());
         return;
     }
 
@@ -440,7 +439,7 @@ void Sound::WriteWAV(const std::string& path) {
 
 void Sound::WriteWAVLooped(const std::string& path, double seconds) {
 	size_t samples_per_second = sampleRate * channels;
-	size_t target_samples = static_cast<size_t>(seconds * samples_per_second);
+	auto target_samples = static_cast<size_t>(seconds * samples_per_second);
 
 	size_t loop_start_sample = loop_start * channels;
 	size_t loop_end_sample   = sampleCount * channels;
@@ -477,6 +476,6 @@ void Sound::WriteWAVLooped(const std::string& path, double seconds) {
 
 double Sound::GetDurationSeconds() const
 {
-    return (double)samples.size() / sampleRate / channels;
+    return static_cast<double>(samples.size()) / sampleRate / channels;
 }
 }
