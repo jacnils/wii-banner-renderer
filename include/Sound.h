@@ -1,5 +1,6 @@
 /*
 Copyright (c) 2010 - Wii Banner Player Project
+Copyright (c) 2026 - Jacob Nilsson
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -37,6 +38,11 @@ class Sound
         std::vector<int16_t> samples{};
         uint16_t channels = 0;
         uint32_t sampleRate = 0;
+		uint32_t sampleCount = 0;
+
+	uint32_t loop_start = 0;
+	uint32_t loop_end = 0;
+	bool has_loop = false;
 
 	void WritePCMAsWAV(const std::string& path,
                    const std::vector<int16_t>& samples,
@@ -44,10 +50,11 @@ class Sound
                    uint32_t sampleRate);
 public:
 	Sound() {}
-	~Sound();
+	~Sound() = default;
 
 	bool Load(std::istream& file);
 	void WriteWAV(const std::string& path);
+	void WriteWAVLooped(const std::string& path, double seconds);
 	double GetDurationSeconds() const;
 };
 

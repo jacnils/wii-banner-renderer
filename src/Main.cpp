@@ -30,6 +30,7 @@ distribution.
 
 #include <iostream>
 #include <filesystem>
+#include <cmath>
 
 #include "Banner.h"
 #include "Renderer.h"
@@ -41,6 +42,14 @@ struct Settings {
 	int maximum_length = -1; // max seconds
 	bool save_frames = false; // save frames? (wastes your time, useful for debugging)
 	int frames_to_save = -1; // -1 = save all frames iterated through
+
+	void print_settings() const {
+		std::cout << "FPS: " << fps << "\n";
+		std::cout << "Minimum length: " << (minimum_length == -1 ? "No limit" : std::to_string(minimum_length)) << " sec\n";
+		std::cout << "Maximum length: " << (maximum_length == -1 ? "No limit" : std::to_string(maximum_length)) << " sec\n";
+		std::cout << "Save frames: " << save_frames << "\n";
+		std::cout << "Frames to save (if enabled): " << (frames_to_save == -1 ? "all" : std::to_string(frames_to_save)) << "\n";
+	}
 };
 
 // wrapper for opening processes
@@ -121,8 +130,19 @@ int process(const std::string& input_opening, Settings settings = {}) {
     }
 
     banner.GetSound()->WriteWAV(base_filename + ".wav");
+	double runtime = banner.GetSound()->GetDurationSeconds();
 
-    int sfx_length = static_cast<int>(banner.GetSound()->GetDurationSeconds());
+	if (settings.maximum_length >= 0) {
+		runtime = std::min(runtime, static_cast<double>(settings.maximum_length));
+	}
+	if (settings.minimum_length >= 0) {
+		runtime = std::max(runtime, static_cast<double>(settings.minimum_length));
+	}
+
+	banner.GetSound()->WriteWAVLooped(
+		base_filename + ".wav",
+		runtime
+	);
 
 	ProcPtr ffmpeg{
 		"ffmpeg -y "
@@ -133,20 +153,14 @@ int process(const std::string& input_opening, Settings settings = {}) {
 	"-framerate " + std::to_string(settings.fps) + " "
 	"-i - "
 	"-i " + base_filename + ".wav "
+		"-t " + std::to_string(runtime) + " "
 	"-vf \"crop=933:403:970:545,scale=trunc(iw/2)*2:trunc(ih/2)*2\" "
 	"-c:v libx264 "
 	"-pix_fmt yuv420p "
 	"-c:a aac "
-	"-shortest "
+	//"-shortest "
 	+ base_filename + ".mp4", "w"};
 
-	int runtime = sfx_length;
-	if (settings.maximum_length >= 0) {
-		runtime = std::min(settings.maximum_length, runtime);
-	}
-	if (settings.minimum_length >= 0) {
-		runtime = std::max(settings.minimum_length, runtime);
-	}
 
     for (int i = 0; i < settings.fps * runtime; i++) {
     	renderer.BeginFrame();
@@ -288,6 +302,9 @@ int main(int argc, char** argv) {
 			openings.emplace_back(arg);
 		}
 	}
+
+	std::cout << "Settings:\n";
+	settings.print_settings();
 
 	int ret_val = EXIT_SUCCESS;
 	for (const auto& it : openings) {

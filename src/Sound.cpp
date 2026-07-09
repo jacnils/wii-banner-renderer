@@ -59,36 +59,36 @@ struct BNS
 	struct BNSHeader
 	{
 		FourCC magic;
-		u32 endian;
-		u32 size;
-		u32 unk;
-		u32 info_off;
-		u32 info_len;
-		u32 data_off;
-		u32 data_len;
+		u32 endian{};
+		u32 size{};
+		u32 unk{};
+		u32 info_off{};
+		u32 info_len{};
+		u32 data_off{};
+		u32 data_len{};
 	};
 
 	struct BNSInfo
 	{
 		FourCC magic;
-		u32 size;
-		u8 codec;
-		u8 loop;
-		u8 channel_count;
-		u8 unk;
-		u16 sample_rate;
-		u16 unk2;
-		u32 loop_start; // do we care?
-		u32 sample_count;
+		u32 size{};
+		u8 codec{};
+		u8 loop{};
+		u8 channel_count{};
+		u8 unk{};
+		u16 sample_rate{};
+		u16 unk2{};
+		u32 loop_start{}; // do we care?
+		u32 sample_count{};
 		// TODO SO MANY unknowns
-		u32 right_start;
-		s16 coefs[2][16];
+		u32 right_start{};
+		s16 coefs[2][16]{};
 	};
 
 	struct BNSData
 	{
 		FourCC magic;
-		u32 size;
+		u32 size{};
 	};
 
 	struct DSPRegs
@@ -101,12 +101,12 @@ struct BNS
 		void ClearHistory() { yn1 = yn2 = 0; }
 	};
 
-	std::streamoff start;
+	std::streamoff start{};
 	BNSHeader hdr;
 	BNSInfo info;
 	BNSData data;
 	u8 *adpcm;
-	DSPRegs dsp_regs;
+	DSPRegs dsp_regs{};
 
 	BNS() : adpcm(nullptr) {}
 	~BNS() { delete[] adpcm; }
@@ -118,12 +118,12 @@ struct BNS
 		in >> hdr.magic >> BE >> hdr.endian >> hdr.size >> hdr.unk
 			>> hdr.info_off >> hdr.info_len >> hdr.data_off >> hdr.data_len;
 
-		in.seekg(start + hdr.info_off, in.beg);
+		in.seekg(start + hdr.info_off, std::istream::beg);
 		in >> info.magic >> BE >> info.size >> info.codec >> info.loop
 			>> info.channel_count >> info.unk >> info.sample_rate
 			>> info.unk2 >> info.loop_start >> info.sample_count;
 
-		in.seekg(6 * sizeof(u32), in.cur);
+		in.seekg(6 * sizeof(u32), std::istream::cur);
 
 		if (info.channel_count == 1)
 		{
@@ -141,7 +141,7 @@ struct BNS
 		}
 		else
 		{
-			std::cout << (int)info.channel_count << " channels unsupported!\n";
+			std::cout << static_cast<int>(info.channel_count) << " channels unsupported!\n";
 		}
 
 		in.seekg(start + hdr.data_off, in.beg);
@@ -158,9 +158,15 @@ struct BNS
 			std::cout << "sound.bin appears invalid\n";
 	}
 
-	u8  GetChannelsCount() { return info.channel_count; }
-	u32 GetSamplesCount()  { return info.sample_count * GetChannelsCount(); }
-	u16 GetSampleRate()    { return info.sample_rate; }
+	u8  GetChannelsCount() const { return info.channel_count; }
+	u32 GetSamplesCount() const { return info.sample_count * GetChannelsCount(); }
+	u16 GetSampleRate() const { return info.sample_rate; }
+	u8 GetLoop() const {
+		return info.loop;
+	}
+	u32 GetLoopStart() const {
+		return info.loop_start;
+	}
 
 	u32 DecodeChannelToPCM(s16 *pcm, u32 pcm_start_pos,
 		u32 adpcm_start_pos, u32 adpcm_end_pos)
@@ -279,11 +285,6 @@ u32 DecodeToPCM(s16* pcm)
 }
 };
 
-Sound::~Sound()
-{
-	//
-}
-
 bool Sound::Load(std::istream& file)
 {
     FourCC magic;
@@ -295,16 +296,14 @@ bool Sound::Load(std::istream& file)
     const std::streamoff start = in.tellg();
     in >> magic;
 
-    if (magic == BINARY_MAGIC_WAV)
-    {
+    if (magic == BINARY_MAGIC_WAV) {
         std::cout << "WAV detected\n";
 
         in >> LE >> file_len;
         in.seekg(start, in.beg);
 
-        // just copy WAV directly
         rawData.resize(file_len);
-        in.read((char*)rawData.data(), file_len);
+        in.read(reinterpret_cast<char *>(rawData.data()), file_len);
 
         format = FORMAT_WAV;
         return true;
@@ -336,9 +335,12 @@ else if (magic == BINARY_MAGIC_BNS)
     bns_file.Open(in);
     std::cout << "BNS opened\n";
 
-    uint32_t sampleCount = bns_file.GetSamplesCount();
+	sampleCount = bns_file.GetSamplesCount();
     uint16_t channels    = bns_file.GetChannelsCount();
     uint32_t sampleRate  = bns_file.GetSampleRate();
+	loop_start = bns_file.GetLoopStart();
+	loop_end   = sampleCount;
+	has_loop   = bns_file.GetLoop();
 
     std::cout
         << "samples=" << sampleCount
@@ -434,6 +436,43 @@ void Sound::WriteWAV(const std::string& path) {
     }
 
     WritePCMAsWAV(path, samples, channels, sampleRate);
+}
+
+void Sound::WriteWAVLooped(const std::string& path, double seconds) {
+	size_t samples_per_second = sampleRate * channels;
+	size_t target_samples = static_cast<size_t>(seconds * samples_per_second);
+
+	size_t loop_start_sample = loop_start * channels;
+	size_t loop_end_sample   = sampleCount * channels;
+
+	std::vector<int16_t> output;
+	output.reserve(target_samples);
+
+	size_t intro_samples = std::min(loop_start_sample, samples.size());
+	output.insert(output.end(), samples.begin(), samples.begin() + intro_samples);
+
+	if (has_loop && loop_end_sample > loop_start_sample) {
+		while (output.size() < target_samples) {
+			size_t remaining = target_samples - output.size();
+			size_t loop_size = loop_end_sample - loop_start_sample;
+
+			size_t copy_count = std::min(remaining, loop_size);
+
+			output.insert(
+				output.end(),
+				samples.begin() + loop_start_sample,
+				samples.begin() + loop_start_sample + copy_count
+			);
+		}
+	} else {
+		output.resize(target_samples, 0);
+	}
+
+	if (output.size() > target_samples) {
+		output.resize(target_samples);
+	}
+
+	WritePCMAsWAV(path, output, channels, sampleRate);
 }
 
 double Sound::GetDurationSeconds() const
