@@ -285,6 +285,90 @@ u32 DecodeToPCM(s16* pcm)
 }
 };
 
+	// get metadata and shit so we can loop wavs
+	bool Sound::ParseWAV() {
+		const uint8_t* data = rawData.data();
+		size_t size = rawData.size();
+
+		if (size < 12) return false;
+
+		if (memcmp(data, "RIFF", 4) != 0 || memcmp(data + 8, "WAVE", 4) != 0)
+			return false;
+
+		size_t offset = 12;
+
+		const uint8_t* dataPtr = nullptr;
+		uint32_t dataSize = 0;
+		uint16_t bitsPerSample = 0;
+
+		while (offset + 8 <= size)
+		{
+			const char* chunkId = reinterpret_cast<const char*>(data + offset);
+			uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(data + offset + 4);
+			offset += 8;
+
+			if (memcmp(chunkId, "fmt ", 4) == 0)
+			{
+				if (chunkSize < 16) return false;
+
+				uint16_t audioFormat = *reinterpret_cast<const uint16_t*>(data + offset + 0);
+				channels             = *reinterpret_cast<const uint16_t*>(data + offset + 2);
+				sampleRate           = *reinterpret_cast<const uint32_t*>(data + offset + 4);
+				bitsPerSample        = *reinterpret_cast<const uint16_t*>(data + offset + 14);
+
+				if (audioFormat != 1) {
+					std::cerr << "Only PCM WAV supported\n";
+					return false;
+				}
+			}
+			else if (memcmp(chunkId, "data", 4) == 0)
+			{
+				dataPtr  = data + offset;
+				dataSize = chunkSize;
+			}
+			else if (memcmp(chunkId, "smpl", 4) == 0)
+			{
+				if (chunkSize < 36) {
+					offset += chunkSize;
+					continue;
+				}
+
+				uint32_t numLoops = *reinterpret_cast<const uint32_t*>(data + offset + 28);
+
+				if (numLoops > 0) {
+					const uint8_t* loopPtr = data + offset + 36;
+
+					uint32_t start = *reinterpret_cast<const uint32_t*>(loopPtr + 8);
+					uint32_t end   = *reinterpret_cast<const uint32_t*>(loopPtr + 12);
+
+					loop_start = start;
+					sampleCount = end;
+					has_loop = true;
+				}
+			}
+
+			offset += chunkSize;
+			if (chunkSize % 2 == 1) offset++;
+		}
+
+		if (!dataPtr || dataSize == 0 || sampleRate == 0 || channels == 0)
+			return false;
+
+		if (bitsPerSample != 16) {
+			std::cerr << "Only 16-bit WAV supported\n";
+			return false;
+		}
+
+		size_t totalSamples = dataSize / sizeof(int16_t);
+
+		samples.resize(totalSamples);
+		memcpy(samples.data(), dataPtr, dataSize);
+
+		sampleCount = totalSamples / channels;
+
+		return true;
+	}
+
 bool Sound::Load(std::istream& file)
 {
     FourCC magic;
@@ -306,7 +390,8 @@ bool Sound::Load(std::istream& file)
         in.read(reinterpret_cast<char *>(rawData.data()), file_len);
 
         format = FORMAT_WAV;
-        return true;
+
+    	return ParseWAV();
     }
     if (magic == BINARY_MAGIC_AIFF)
     {
@@ -335,11 +420,11 @@ bool Sound::Load(std::istream& file)
 	    std::cout << "BNS opened\n";
 
 	    sampleCount = bns_file.GetSamplesCount();
-	    uint16_t channels    = bns_file.GetChannelsCount();
-	    uint32_t sampleRate  = bns_file.GetSampleRate();
-	    loop_start = bns_file.GetLoopStart();
-	    loop_end   = sampleCount;
-	    has_loop   = bns_file.GetLoop();
+	    channels    = bns_file.GetChannelsCount();
+	    sampleRate  = bns_file.GetSampleRate();
+	    loop_start  = bns_file.GetLoopStart();
+	    loop_end    = sampleCount;
+    	has_loop   = bns_file.GetLoop();
 
 	    std::cout
 			    << "samples=" << sampleCount
@@ -439,6 +524,14 @@ void Sound::WriteWAV(const std::string& path) {
 
 void Sound::WriteWAVLooped(const std::string& path, double seconds) {
 	size_t samples_per_second = sampleRate * channels;
+
+	if (samples_per_second == 0 ||
+		seconds > static_cast<double>(std::numeric_limits<size_t>::max() / samples_per_second)) {
+		std::cerr << "samples_per_second: " << samples_per_second << "\n";
+		std::cerr << "seconds: " << seconds << "\n";
+		throw std::overflow_error("Requested duration too large");
+	}
+
 	auto target_samples = static_cast<size_t>(seconds * samples_per_second);
 
 	size_t loop_start_sample = loop_start * channels;
@@ -474,8 +567,9 @@ void Sound::WriteWAVLooped(const std::string& path, double seconds) {
 	WritePCMAsWAV(path, output, channels, sampleRate);
 }
 
-double Sound::GetDurationSeconds() const
-{
+double Sound::GetDurationSeconds() const {
+	if (sampleRate == 0) throw std::runtime_error("Sample rate is zero");
+	if (channels == 0) throw std::runtime_error("Channels is zero");
     return static_cast<double>(samples.size()) / sampleRate / channels;
 }
 }

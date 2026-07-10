@@ -406,11 +406,11 @@ void Material::ProcessHermiteKey(const KeyType& type, float value)
 		}
 		return;	// TODO: remove this return
 	}
-	else if (type.type == ANIMATION_TYPE_IND_MATERIAL)	// ind texture crap
+	else if (type.type == ANIMATION_TYPE_IND_MATERIAL)	// ind texture crap TODO REALLY FIX THIS SHIT
 	{
 		if (type.target < 5) //&& type.index < ind_srts.size())
 		{
-			std::cout << "topkek";
+			std::cout << "ANIMATION_TYPE_IND_MATERIAL not supported yet, todo fix this shit";
 			//(&ind_srts[type.index].translate_x)[type.target] = value;
 			return;
 		}

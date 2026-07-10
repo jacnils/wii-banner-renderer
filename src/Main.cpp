@@ -42,6 +42,7 @@ struct Settings {
 	int maximum_length = -1; // max seconds
 	bool save_frames = false; // save frames? (wastes your time, useful for debugging)
 	int frames_to_save = -1; // -1 = save all frames iterated through
+	bool no_audio = false; // no audio, for debugging
 
 	void print_settings() const {
 		std::cout << "FPS: " << fps << "\n";
@@ -121,16 +122,23 @@ int process(const std::string& input_opening, Settings settings = {}) {
     WiiBanner::Banner banner(opening);
 
     banner.LoadBanner();
-    banner.LoadSound();
+
+	if (!settings.no_audio)
+		banner.LoadSound();
 
     banner.GetBanner()->SetLanguage("ENG");
 
-    if (!banner.GetSound()) {
-    	throw std::runtime_error{"GetSound() failed"};
-    }
+	if (!settings.no_audio) {
+		if (!banner.GetSound()) {
+			throw std::runtime_error{"GetSound() failed"};
+		}
+	}
+	double runtime{};
 
-    banner.GetSound()->WriteWAV(base_filename + ".wav");
-	double runtime = banner.GetSound()->GetDurationSeconds();
+	if (!settings.no_audio) {
+		banner.GetSound()->WriteWAV(base_filename + ".wav");
+		runtime = banner.GetSound()->GetDurationSeconds();
+	}
 
 	if (settings.maximum_length >= 0) {
 		runtime = std::min(runtime, static_cast<double>(settings.maximum_length));
@@ -139,10 +147,17 @@ int process(const std::string& input_opening, Settings settings = {}) {
 		runtime = std::max(runtime, static_cast<double>(settings.minimum_length));
 	}
 
-	banner.GetSound()->WriteWAVLooped(
-		base_filename + ".wav",
-		runtime
-	);
+	if (!settings.no_audio) {
+		banner.GetSound()->WriteWAVLooped(
+			base_filename + ".wav",
+			runtime
+		);
+	}
+
+	std::string audio_param;
+	if (!settings.no_audio) {
+		audio_param = "-i " "\"" + base_filename + ".wav" + "\"" " ";
+	}
 
 	ProcPtr ffmpeg{
 		"ffmpeg -y "
@@ -151,15 +166,13 @@ int process(const std::string& input_opening, Settings settings = {}) {
 	"-pixel_format rgba "
 	"-video_size 1920x1080 "
 	"-framerate " + std::to_string(settings.fps) + " "
-	"-i - "
-	"-i " + base_filename + ".wav "
-		"-t " + std::to_string(runtime) + " "
+	"-i - " + audio_param + "-t " + std::to_string(runtime) + " "
 	"-vf \"crop=933:403:970:545,scale=trunc(iw/2)*2:trunc(ih/2)*2\" "
 	"-c:v libx264 "
 	"-pix_fmt yuv420p "
 	"-c:a aac "
 	//"-shortest "
-	+ base_filename + ".mp4", "w"};
+	"\"" + base_filename + ".mp4" + "\"", "w"};
 
 
     for (int i = 0; i < settings.fps * runtime; i++) {
@@ -207,7 +220,7 @@ static std::string trim(const std::string& s) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-min int|-max int|-s int\n";
+        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-m|-min int|-max int|-s int\n";
         return EXIT_FAILURE;
     }
 
@@ -230,6 +243,10 @@ int main(int argc, char** argv) {
 				if (!item.empty())
 					openings.emplace_back(item);
 			}
+		}
+		if (arg == "-m") {
+			// mute
+			settings.no_audio = true;
 		}
 
 		if (arg == "-s") {

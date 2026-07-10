@@ -41,17 +41,22 @@ class Sound
 
 	uint32_t loop_start = 0;
 	uint32_t loop_end = 0;
+	uint32_t wav_data_size = 0;
+	uint32_t wav_byte_rate = 0;
 	bool has_loop = false;
 
 	static void WritePCMAsWAV(const std::string& path,
 	                          const std::vector<int16_t>& samples,
 	                          uint16_t channels,
 	                          uint32_t sampleRate);
+	bool ParseWAV();
+
 public:
 	Sound() = default;
 	~Sound() = default;
 
 	bool Load(std::istream& file);
+
 	void WriteWAV(const std::string& path);
 	void WriteWAVLooped(const std::string& path, double seconds);
 	[[nodiscard]] double GetDurationSeconds() const;
