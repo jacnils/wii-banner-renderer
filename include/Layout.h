@@ -39,13 +39,12 @@ namespace WiiBanner
 
 using PaletteList = std::vector<std::string>; // maybe use std::set?
 
-struct Resources
-{
-	MaterialList materials;
-	TextureList textures;
-	FontList fonts;
-	PaletteList palettes[2];
-	u8 cur_set;
+struct Resources {
+	MaterialList materials{};
+	TextureList textures{};
+	FontList fonts{};
+	std::vector<PaletteList> palettes{};
+	u8 cur_set{};
 };
 
 class Layout

@@ -327,15 +327,16 @@ Texture* Layout::FindTexture(const std::string& find_name) {
 void Layout::AddPalette(const std::string& name, u8 key_set) {
 	std::cout << "AddPalette: " << name << "\n";
 
-	resources.palettes[key_set].push_back(name);
+	if (resources.palettes.size() <= key_set)
+		resources.palettes.resize(key_set + 1);
+
+	resources.palettes.at(key_set).push_back(name);
 
 	if (FindTexture(name))
 	{
 		std::cout << "already exists\n";
 		return;
 	}
-
-
 
 	auto* texture = new Texture;
 	texture->SetName(name);
@@ -350,6 +351,7 @@ void Layout::AddPalette(const std::string& name, u8 key_set) {
 
 	std::cout << "added texture: " << texture->GetName() << "\n";
 }
+
 Pane* Layout::FindPane(const std::string& find_name)
 {
 	Pane* found = nullptr;

@@ -272,6 +272,10 @@ void Material::ApplyTextures(const Resources &resources) const {
 		}
 		else
 		{
+
+			if (resources.cur_set >= resources.palettes.size())
+				throw std::runtime_error("invalid palette set");
+
 			if (palette_texture[i] >= resources.palettes[resources.cur_set].size()){
 				throw std::runtime_error{"palette index is out of range, requested: " + std::to_string(palette_texture[i])};
 			}
