@@ -281,6 +281,8 @@ u32 DecodeToPCM(s16* pcm)
         );
     }
 
+
+
     return end;
 }
 };
@@ -449,6 +451,15 @@ bool Sound::Load(std::istream& file)
 
 	    samples.resize(written);
 
+    	std::cout << "Decoded samples: " << samples.size() << "\n";
+    	std::cout << "Channels: " << channels << "\n";
+    	std::cout << "Remainder: " << (samples.size() % channels) << "\n";
+
+    	// crap hack
+    	if (samples.size() % channels != 0) {
+    		samples.resize((samples.size() / channels) * channels);
+    	}
+
 	    std::cout << "Decode complete\n";
 
 	    this->channels = channels;
@@ -522,54 +533,92 @@ void Sound::WriteWAV(const std::string& path) {
     WritePCMAsWAV(path, samples, channels, sampleRate);
 }
 
-void Sound::WriteWAVLooped(const std::string& path, double seconds) {
-	size_t samples_per_second = sampleRate * channels;
+void Sound::WriteWAVLooped(const std::string& path, double seconds)
+{
+    if (sampleRate == 0 || channels == 0)
+        throw std::runtime_error("Invalid audio format");
 
-	if (samples_per_second == 0 ||
-		seconds > static_cast<double>(std::numeric_limits<size_t>::max() / samples_per_second)) {
-		std::cerr << "samples_per_second: " << samples_per_second << "\n";
-		std::cerr << "seconds: " << seconds << "\n";
-		throw std::overflow_error("Requested duration too large");
-	}
+    if (samples.empty())
+        throw std::runtime_error("No PCM samples loaded");
 
-	auto target_samples = static_cast<size_t>(seconds * samples_per_second);
+    if (sampleCount == 0)
+        throw std::runtime_error("sampleCount is zero");
 
-	size_t loop_start_sample = loop_start * channels;
-	size_t loop_end_sample   = sampleCount * channels;
+    const size_t target_frames = static_cast<size_t>(seconds * sampleRate);
+    const size_t target_samples = target_frames * channels;
 
-	std::vector<int16_t> output;
-	output.reserve(target_samples);
+	if (samples.size() % channels != 0)
+		throw std::runtime_error("PCM misaligned");
 
-	size_t intro_samples = std::min(loop_start_sample, samples.size());
-	output.insert(output.end(), samples.begin(), samples.begin() + intro_samples);
+	const size_t total_frames = samples.size() / channels;
+    const size_t total_samples = total_frames * channels;
 
-	if (has_loop && loop_end_sample > loop_start_sample) {
-		while (output.size() < target_samples) {
-			size_t remaining = target_samples - output.size();
-			size_t loop_size = loop_end_sample - loop_start_sample;
+    if (samples.size() < total_samples)
+        throw std::runtime_error("samples buffer smaller than expected");
 
-			size_t copy_count = std::min(remaining, loop_size);
+    size_t loop_start_frame = std::min(static_cast<size_t>(loop_start), total_frames);
+    size_t loop_end_frame   = total_frames;
 
-			output.insert(
-				output.end(),
-				samples.begin() + loop_start_sample,
-				samples.begin() + loop_start_sample + copy_count
-			);
-		}
-	} else {
-		output.resize(target_samples, 0);
-	}
+    if (has_loop && loop_start_frame >= loop_end_frame)
+        has_loop = false;
 
-	if (output.size() > target_samples) {
-		output.resize(target_samples);
-	}
+    std::vector<int16_t> output;
+    output.reserve(target_samples);
 
-	WritePCMAsWAV(path, output, channels, sampleRate);
+    size_t intro_frames = std::min(loop_start_frame, target_frames);
+    size_t intro_samples = intro_frames * channels;
+
+    output.insert(
+        output.end(),
+        samples.begin(),
+        samples.begin() + intro_samples
+    );
+
+    if (has_loop) {
+        const size_t loop_frames = loop_end_frame - loop_start_frame;
+        const size_t loop_samples = loop_frames * channels;
+
+        const size_t loop_start_sample = loop_start_frame * channels;
+
+        while (output.size() < target_samples) {
+            size_t remaining_samples = target_samples - output.size();
+            size_t remaining_frames  = remaining_samples / channels;
+
+            if (remaining_frames == 0)
+                break;
+
+            size_t copy_frames = std::min(remaining_frames, loop_frames);
+            size_t copy_samples = copy_frames * channels;
+
+            const size_t src_start = loop_start_sample;
+            const size_t src_end   = src_start + copy_samples;
+
+            if (src_end > samples.size())
+                throw std::runtime_error("out of bounds");
+
+            output.insert(
+                output.end(),
+                samples.begin() + src_start,
+                samples.begin() + src_end
+            );
+        }
+    }
+    else {
+        output.resize(target_samples, 0);
+    }
+
+    if (output.size() > target_samples)
+        output.resize(target_samples);
+
+    if (output.size() % channels != 0)
+        throw std::runtime_error("output not aligned");
+
+    WritePCMAsWAV(path, output, channels, sampleRate);
 }
 
 double Sound::GetDurationSeconds() const {
-	if (sampleRate == 0) throw std::runtime_error("Sample rate is zero");
-	if (channels == 0) throw std::runtime_error("Channels is zero");
+	if (sampleRate == 0) throw std::runtime_error("sample rate is zero");
+	if (channels == 0) throw std::runtime_error("channels is zero");
     return static_cast<double>(samples.size()) / sampleRate / channels;
 }
 }
