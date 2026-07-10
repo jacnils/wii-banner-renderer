@@ -21,8 +21,7 @@ misrepresented as being the original software.
 distribution.
 */
 
-#ifndef WII_BNR_MATERIAL_H_
-#define WII_BNR_MATERIAL_H_
+#pragma once
 
 #include "Animator.h"
 #include "Texture.h"
@@ -170,5 +169,3 @@ public:
 };
 
 }
-
-#endif

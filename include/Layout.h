@@ -54,7 +54,7 @@ public:
 
 	void Render(float aspect_ratio, float zoom = 1.f) const;
 
-	FrameNumber GetFrame() const { return frame_current; }
+	[[nodiscard]] FrameNumber GetFrame() const { return frame_current; }
 	void SetFrame(FrameNumber frame_number);
 	void AdvanceFrame();
 

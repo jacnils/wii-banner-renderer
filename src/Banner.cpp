@@ -49,92 +49,9 @@ enum BinaryMagic : u32
 	BINARY_MAGIC_PANE_ANIMATION_INFO = MAKE_FOURCC('p', 'a', 'i', '1')
 };
 
-// load keyframes from a brlan file
-// TODO: can put this function somewhere better :p
-FrameNumber LoadAnimators(std::istream& file, Layout& layout, u8 key_set)
-{
-	const std::streamoff file_start = file.tellg();
-
-	u16 frame_count;
-
-	// read header
-	FourCC header_magic;
-	u16 endian; // always 0xFEFF
-	u16 version; // always 0x0008
-
-	file >> header_magic >> BE >> endian >> version;
-
-	if (header_magic != BINARY_MAGIC_ANIMATION
-		|| endian != 0xFEFF
-		|| version != 0x008
-		)
-		return 0;	// bad header
-
-
-	u32 file_size;
-	u16 offset; // offset to the first section
-	u16 section_count;
-
-	file >> BE >> file_size >> offset >> section_count;
-
-	// only a single pa*1 section is currently supported
-	//if (section_count > 1)
-	//	section_count = 1;
-
-	// seek to header of first section
-	file.seekg(file_start + offset, std::ios::beg);
-
-	ReadSections(file, section_count, [&](FourCC magic, std::streamoff section_start)
-	{
-		if (magic == BINARY_MAGIC_PANE_ANIMATION_INFO)
-		{
-			u8 loop; // ?
-			u8 pad;
-			u16 file_count; // ?
-			u16 animator_count;
-			u32 entry_offset;
-
-			file >> BE >> frame_count >> loop
-				>> pad >> file_count >> animator_count;
-
-			file >> BE >> entry_offset;
-			file.seekg(section_start + entry_offset);
-
-			// read each animator
-			ReadOffsetList<u32>(file, animator_count, section_start, [&]
-			{
-				const std::streamoff origin = file.tellg();
-
-				const std::string animator_name = ReadFixedLengthString<Animator::NAME_LENGTH>(file);
-
-				u8 tag_count;
-				u8 is_material;
-				u16 apad;
-
-				file >> BE >> tag_count >> is_material >> apad;
-
-				Animator* const animator = is_material ?
-					static_cast<Animator*>(layout.FindMaterial(animator_name)) :
-					static_cast<Animator*>(layout.FindPane(animator_name));
-
-				if (animator)
-					animator->LoadKeyFrames(file, tag_count, origin, key_set);
-			});
-		}
-		else
-		{
-			std::cout << "UNKNOWN SECTION: ";
-			std::cout << magic << '\n';
-		}
-	});
-
-	return frame_count;
-}
-
 Banner::Banner(const std::string& _filename)
 	: layout_banner(nullptr)
 	, layout_icon(nullptr)
-	//, sound(nullptr)
 	, filename(_filename)
 {
 	std::ifstream bnr_file(filename, std::ios::binary | std::ios::in);
@@ -246,6 +163,34 @@ Layout* Banner::LoadLayout(const std::string& lyt_name, std::streamoff offset, V
 	layout->SetWidth(size.x);
 	layout->SetHeight(size.y);
 
+	// load animations
+	FrameNumber length_start = 0, length_loop = 0;
+
+	auto const brlan_start_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Start.brlan");
+
+	// alt. start file
+	if (!brlan_start_offset) {
+		bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_In.brlan");
+	}
+
+	if (brlan_start_offset) {
+		file.seekg(brlan_start_offset, std::ios::beg);
+		length_start = Animator::LoadAnimators(file, *layout, 0);
+	}
+
+	auto brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + ".brlan");
+	if (!brlan_loop_offset) {
+		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Loop.brlan");
+	}
+	if (!brlan_loop_offset) {
+		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Rso0.brlan");
+	}
+
+	if (brlan_loop_offset) {
+		file.seekg(brlan_loop_offset, std::ios::beg);
+		length_loop = Animator::LoadAnimators(file, *layout, 1);
+	}
+
 	// load textures
 	for (Texture* texture : layout->resources.textures)
 	{
@@ -259,50 +204,22 @@ Layout* Banner::LoadLayout(const std::string& lyt_name, std::streamoff offset, V
 
 	// load fonts
 	{
-	// this guy is in "User/Wii/shared1"
-	std::ifstream font_file("00000003.app", std::ios::binary | std::ios::in);
-	DiscIO::CARCFile font_arc(font_file);
+		// this guy is in "User/Wii/shared1"
+		std::ifstream font_file("00000003.app", std::ios::binary | std::ios::in);
+		DiscIO::CARCFile font_arc(font_file);
 
-	for (Font* font : layout->resources.fonts)
-	{
-		auto const font_offset = font_arc.GetFileOffset(font->GetName());
-
-		if (font_offset)
+		for (Font* font : layout->resources.fonts)
 		{
-			font_file.seekg(font_offset, std::ios::beg);
-			font->Load(font_file);
+			auto const font_offset = font_arc.GetFileOffset(font->GetName());
 
-			//std::cout << "font name: " << font->name << '\n';
+			if (font_offset)
+			{
+				font_file.seekg(font_offset, std::ios::beg);
+				font->Load(font_file);
+
+				//std::cout << "font name: " << font->name << '\n';
+			}
 		}
-	}
-	}
-
-	// load animations
-	FrameNumber length_start = 0, length_loop = 0;
-
-	auto const brlan_start_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Start.brlan");
-
-	// alt. start file
-	if (!brlan_start_offset) {
-		bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_In.brlan");
-	}
-
-	if (brlan_start_offset) {
-		file.seekg(brlan_start_offset, std::ios::beg);
-		length_start = LoadAnimators(file, *layout, 0);
-	}
-
-	auto brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + ".brlan");
-	if (!brlan_loop_offset) {
-		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Loop.brlan");
-	}
-	if (!brlan_loop_offset) {
-		brlan_loop_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Rso0.brlan");
-	}
-
-	if (brlan_loop_offset) {
-		file.seekg(brlan_loop_offset, std::ios::beg);
-		length_loop = LoadAnimators(file, *layout, 1);
 	}
 
 	layout->SetLoopStart(length_start);

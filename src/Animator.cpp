@@ -26,12 +26,94 @@ distribution.
 #include "Animator.h"
 #include "Endian.h"
 #include "Funcs.h"
+#include "Layout.h"
 
-namespace WiiBanner
-{
+enum BinaryMagic : u32 {
+	BINARY_MAGIC_ANIMATION = MAKE_FOURCC('R', 'L', 'A', 'N'),
+	BINARY_MAGIC_PANE_ANIMATION_INFO = MAKE_FOURCC('p', 'a', 'i', '1')
+};
 
-void Animator::LoadKeyFrames(std::istream& file, u8 tag_count, std::streamoff origin, u8 key_set)
-{
+namespace WiiBanner {
+	FrameNumber Animator::LoadAnimators(std::istream& file, Layout& layout, u8 key_set) {
+		const std::streamoff file_start = file.tellg();
+
+		u16 frame_count;
+
+		// read header
+		FourCC header_magic;
+		u16 endian; // always 0xFEFF
+		u16 version; // always 0x0008
+
+		file >> header_magic >> BE >> endian >> version;
+
+		if (header_magic != BINARY_MAGIC_ANIMATION
+			|| endian != 0xFEFF
+			|| version != 0x008
+			)
+			return 0;	// bad header
+
+
+		u32 file_size;
+		u16 offset; // offset to the first section
+		u16 section_count;
+
+		file >> BE >> file_size >> offset >> section_count;
+
+		// only a single pa*1 section is currently supported
+		//if (section_count > 1)
+		//	section_count = 1;
+
+		// seek to header of first section
+		file.seekg(file_start + offset, std::ios::beg);
+
+		ReadSections(file, section_count, [&](FourCC magic, std::streamoff section_start)
+		{
+			if (magic == BINARY_MAGIC_PANE_ANIMATION_INFO)
+			{
+				u8 loop; // ?
+				u8 pad;
+				u16 file_count; // ?
+				u16 animator_count;
+				u32 entry_offset;
+
+				file >> BE >> frame_count >> loop
+					>> pad >> file_count >> animator_count;
+
+				file >> BE >> entry_offset;
+				file.seekg(section_start + entry_offset);
+
+				// read each animator
+				ReadOffsetList<u32>(file, animator_count, section_start, [&]
+				{
+					const std::streamoff origin = file.tellg();
+
+					const std::string animator_name = ReadFixedLengthString<Animator::NAME_LENGTH>(file);
+
+					u8 tag_count;
+					u8 is_material;
+					u16 apad;
+
+					file >> BE >> tag_count >> is_material >> apad;
+
+					Animator* const animator = is_material ?
+						reinterpret_cast<Animator*>(layout.FindMaterial(animator_name)) :
+						reinterpret_cast<Animator*>(layout.FindPane(animator_name));
+
+					if (animator)
+						animator->LoadKeyFrames(file, tag_count, origin, key_set);
+				});
+			}
+			else
+			{
+				std::cout << "UNKNOWN SECTION: ";
+				std::cout << magic << '\n';
+			}
+		});
+
+		return frame_count;
+	}
+
+void Animator::LoadKeyFrames(std::istream& file, u8 tag_count, std::streamoff origin, u8 key_set) {
 	ReadOffsetList<u32>(file, tag_count, origin, [&]
 	{
 		const std::streamoff frame_origin = file.tellg();

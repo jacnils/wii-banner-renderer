@@ -31,8 +31,9 @@ distribution.
 
 namespace WiiBanner
 {
+	class Layout;
 
-typedef float FrameNumber;
+	typedef float FrameNumber;
 
 enum AnimationType : u32
 {
@@ -103,6 +104,7 @@ public:
 		NAME_LENGTH = 20
 	};
 
+	static FrameNumber LoadAnimators(std::istream& file, Layout& layout, u8 key_set);
 	void LoadKeyFrames(std::istream& file, u8 tag_count, std::streamoff origin, u8 key_set);
 
 	virtual void SetFrame(FrameNumber frame, u8 key_set);
