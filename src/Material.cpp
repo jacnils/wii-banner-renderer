@@ -26,13 +26,11 @@ distribution.
 #include "Material.h"
 #include "Endian.h"
 #include "Funcs.h"
+#include "Layout.h"
+#include "Texture.h"
 
 namespace WiiBanner
 {
-
-// TODO: handle channel control
-// TODO: handle tev swap table
-// TODO: ind texture stuff
 
 void Material::Load(std::istream& file)
 {
@@ -41,29 +39,6 @@ void Material::Load(std::istream& file)
 	// read colors
 	ReadBEArray(file, &color_regs->r, sizeof(color_regs) / sizeof(s16));
 	ReadBEArray(file, &color_constants->r, sizeof(color_constants));
-
-	union
-	{
-		u32 value;
-
-		struct
-		{
-			u32 texture_map : 4;
-			u32 texture_srt : 4;
-			u32 texture_coord_gen : 4;
-			u32 tev_swap_table : 1;
-			u32 ind_srt : 2;
-			u32 ind_stage : 3;
-			u32 tev_stage : 5;
-			u32 alpha_compare : 1;
-			u32 blend_mode : 1;
-			u32 channel_control : 1;
-			u32 pad : 1;
-			u32 material_color : 1;
-			u32 pad2 : 4;
-		};
-
-	} flags;
 
 	file >> BE >> flags.value;
 
@@ -279,35 +254,63 @@ void Material::Load(std::istream& file)
 	}
 }
 
-void Material::Apply(const TextureList& textures) const
+void Material::ApplyTextures(const Resources &resources) const {
+	u8 tlut_name = 0;
+
+	for (u32 i = 0; i < flags.texture_map; ++i) {
+		const TextureMap& tr = texture_maps[i];
+
+		if (palette_texture[i] == PALETTE_DEFAULT)
+		{
+			if (tr.tex_index < resources.textures.size())
+				resources.textures[tr.tex_index]->Apply(
+					tlut_name,
+					i,
+					tr.wrap_s,
+					tr.wrap_t
+				);
+		}
+		else
+		{
+			if (palette_texture[i] >= resources.palettes[resources.cur_set].size()){
+				throw std::runtime_error{"palette index is out of range"};
+			}
+
+			const auto& name =
+				resources.palettes[resources.cur_set][palette_texture[i]];
+
+			for (u32 n = 0; n < resources.textures.size(); n++)
+			{
+				if (resources.textures[n]->GetName() == name)
+				{
+					resources.textures[n]->Apply(
+						tlut_name,
+						i,
+						tr.wrap_s,
+						tr.wrap_t
+					);
+					break;
+				}
+			}
+		}
+	}
+
+	//GX_InvalidateTexAll();
+}
+
+void Material::Apply(const Resources& resources) const
 {
 	// alpha compare
 	GX_SetAlphaCompare(alpha_compare.function & 0xf, alpha_compare.ref0,
 		alpha_compare.op, alpha_compare.function >> 4, alpha_compare.ref1);
 
 	// blend mode
-	GX_SetBlendMode(blend_mode.type, blend_mode.src_factor, blend_mode.dst_factor, blend_mode.logical_op);
+	GX_SetBlendMode(blend_mode.type, blend_mode.src_factor, blend_mode.dst_factor,
+		blend_mode.logical_op);
 
 	// tev reg colors
 	for (unsigned int i = 0; i != 3; ++i)
 		GX_SetTevColorS10(GX_TEVREG0 + i, color_regs[i]);
-
-	// bind textures
-	{
-	unsigned int i = 0;
-	for (auto& tr : texture_maps)
-	{
-		if (tr.tex_index < textures.size())
-		{
-			auto* const texobj = &textures[tr.tex_index]->texobj;
-
-			GX_LoadTexObj(texobj, i);
-			GX_InitTexObjWrapMode(texobj, tr.wrap_s, tr.wrap_t);
-		}
-
-		++i;
-	}
-	}
 
 	// texture coord gen
 	glMatrixMode(GL_TEXTURE);
@@ -344,6 +347,9 @@ void Material::Apply(const TextureList& textures) const
 	}
 	}
 	glMatrixMode(GL_MODELVIEW);
+
+	// bind textures
+	ApplyTextures(resources);
 
 	// tev stages
 	{
@@ -402,6 +408,12 @@ void Material::ProcessHermiteKey(const KeyType& type, float value)
 	}
 	else if (type.type == ANIMATION_TYPE_IND_MATERIAL)	// ind texture crap
 	{
+		if (type.target < 5) //&& type.index < ind_srts.size())
+		{
+			std::cout << "topkek";
+			//(&ind_srts[type.index].translate_x)[type.target] = value;
+			return;
+		}
 		return;	// TODO: remove this return
 	}
 	else if (type.type == ANIMATION_TYPE_MATERIAL_COLOR)	// material color
@@ -429,18 +441,15 @@ void Material::ProcessHermiteKey(const KeyType& type, float value)
 	Base::ProcessHermiteKey(type, value);
 }
 
-void Material::ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data)
+	void Material::ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data)
 {
 	if (type.type == ANIMATION_TYPE_TEXTURE_PALETTE)	// tpl palette
 	{
-		// TODO: this aint no good
-
-		//if (type.target < texture_maps.size())
-		//{
-		//	texture_maps[type.target].tex_index = data.data2;
-
+		if(type.index < MAX_TEX_MAP)
+		{
+			palette_texture[type.index] = data.data2;
 			return;
-		//}
+		}
 	}
 
 	Base::ProcessStepKey(type, data);

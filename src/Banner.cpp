@@ -192,15 +192,23 @@ Layout* Banner::LoadLayout(const std::string& lyt_name, std::streamoff offset, V
 	}
 
 	// load textures
-	for (Texture* texture : layout->resources.textures)
-	{
+	for (Texture* texture : layout->resources.textures) {
 		auto const texture_offset = bin_arc.GetFileOffset("arc/timg/" + texture->GetName());
+		std::cout << "Loading texture: "
+		  << texture->GetName()
+		  << " offset="
+		  << texture_offset
+		  << "\n";
 		if (texture_offset)
 		{
 			file.seekg(texture_offset, std::ios::beg);
 			texture->Load(file);
 		}
 	}
+
+	std::cout << "textures:\n";
+	for (auto* tex : layout->resources.textures)
+		std::cout << "  " << tex->GetName() << "\n";
 
 	// load fonts
 	{

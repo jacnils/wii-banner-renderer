@@ -96,7 +96,7 @@ public:
 	const std::string& GetName() const { return name; }
 	void SetName(const std::string& _name) { name = _name; }
 
-private:
+protected:
 	std::string name;
 };
 

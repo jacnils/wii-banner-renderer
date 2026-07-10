@@ -68,7 +68,7 @@ void Textbox::Load(std::istream& file)
 void Textbox::Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const
 {
 	if (material_index < resources.materials.size())
-		resources.materials[material_index]->Apply(resources.textures);
+		resources.materials[material_index]->Apply(resources);
 
 	if (font_index < resources.fonts.size())
 		resources.fonts[font_index]->Apply();

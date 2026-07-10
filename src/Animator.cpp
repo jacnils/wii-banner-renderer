@@ -80,6 +80,24 @@ namespace WiiBanner {
 					>> pad >> file_count >> animator_count;
 
 				file >> BE >> entry_offset;
+
+				const std::streamoff name_table_start = file.tellg();
+
+				std::vector<u32> name_offsets(file_count);
+				for (u32 i = 0; i < file_count; i++) {
+					file >> BE >> name_offsets[i];
+				}
+
+				for (u32 i = 0; i < file_count; i++) {
+					file.seekg(name_table_start + static_cast<std::streamoff>(name_offsets[i]));
+					std::string name;
+					std::getline(file, name, '\0'); // null-terminated string
+
+					std::cout << "File: " << name << std::endl;
+
+					layout.AddPalette(name, key_set);
+				}
+
 				file.seekg(section_start + entry_offset);
 
 				// read each animator

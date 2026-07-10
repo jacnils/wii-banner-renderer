@@ -188,7 +188,7 @@ void Quad::Load(std::istream& file)
 void Quad::Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const
 {
 	if (material_index < resources.materials.size())
-		resources.materials[material_index]->Apply(resources.textures);
+		resources.materials[material_index]->Apply(resources);
 
 	// go lambda
 	auto const quad_vertex = [=](unsigned int v, float x, float y)

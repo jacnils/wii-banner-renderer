@@ -39,20 +39,24 @@ public:
 	~Texture();
 
 	void Load(std::istream& file);
+	//[[nodiscard]] const std::string &getName() const { return name; }
+	//void setName(const std::string& _name) { name = _name; }
+	void Apply(u8 &tlutName, u8 map_id, u8 wrap_s, u8 wrap_t) const;
 
 	GXTexObj texobj;
-
 private:
+	//std::string name;
 	char* img_ptr;
 	char* tlut_ptr;
-
 	u32 tlut_name;
+	u32 tlut_format;
+	u16 tlut_count;
 };
 
 class TextureList : public std::vector<Texture*>
 {
 public:
-	static const u32 BINARY_MAGIC = MAKE_FOURCC('t', 'x', 'l', '1');
+	static constexpr u32 BINARY_MAGIC = MAKE_FOURCC('t', 'x', 'l', '1');
 };
 
 }

@@ -316,6 +316,41 @@ void Layout::SetLanguage(const std::string& language)
 	}
 }
 
+Texture* Layout::FindTexture(const std::string& find_name) {
+	for(u32 i = 0; i < resources.textures.size(); ++i) {
+		if (find_name == resources.textures[i]->GetName())
+			return resources.textures[i];
+	}
+
+	return nullptr;
+}
+
+void Layout::AddPalette(const std::string& name, u8 key_set) {
+	std::cout << "AddPalette: " << name << "\n";
+
+	resources.palettes[key_set].push_back(name);
+
+	if (FindTexture(name))
+	{
+		std::cout << "already exists\n";
+		return;
+	}
+
+
+
+	Texture* texture = new Texture;
+	texture->SetName(name);
+
+	std::cout << "Creating texture "
+		  << texture
+		  << " name="
+		  << texture->GetName()
+		  << "\n";
+
+	resources.textures.push_back(texture);
+
+	std::cout << "added texture: " << texture->GetName() << "\n";
+}
 Pane* Layout::FindPane(const std::string& find_name)
 {
 	Pane* found = nullptr;

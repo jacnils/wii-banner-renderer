@@ -37,11 +37,15 @@ distribution.
 namespace WiiBanner
 {
 
+using PaletteList = std::vector<std::string>; // maybe use std::set?
+
 struct Resources
 {
 	MaterialList materials;
 	TextureList textures;
 	FontList fonts;
+	PaletteList palettes[2];
+	u8 cur_set;
 };
 
 class Layout
@@ -73,6 +77,9 @@ public:
 
 	Pane* FindPane(const std::string& name);
 	Material* FindMaterial(const std::string& name);
+	Texture* FindTexture(const std::string& find_name);
+
+	void AddPalette(const std::string &name, u8 key_set);
 
 	// TODO: make private?
 	Resources resources;

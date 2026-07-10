@@ -29,8 +29,9 @@ distribution.
 namespace WiiBanner
 {
 
-class Material : public Animator
-{
+class Resources; // forward declaration, Layout.h
+
+class Material : public Animator {
 public:
 	typedef Animator Base;
 
@@ -39,15 +40,52 @@ public:
 		NAME_LENGTH = 20
 	};
 
-	void Load(std::istream& file);
+	static constexpr u32 MAX_TEX_MAP = 8;
+	static constexpr u32 MAX_TEX_SRT = 10;
+	static constexpr u32 MAX_TEX_GEN = 8;
+	static constexpr u32 MAX_IND_STAGES = 4;
+	static constexpr u32 MAX_TEV_STAGES = 16;
 
-	void Apply(const TextureList& textures) const;
+	static constexpr u8 PALETTE_DEFAULT = 0xFF;
+
+	void Load(std::istream& file);
+	Material() {
+		for( int i = 0; i < 8; i++ )
+			palette_texture[i] = PALETTE_DEFAULT;
+	}
+	void Apply(const Resources& resources) const;
+	void ApplyTextures(const Resources& resources) const;
 
 protected:
 	void ProcessHermiteKey(const KeyType& type, float value);
 	void ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data);
 
 private:
+	union
+	{
+		u32 value;
+
+		struct
+		{
+			u32 texture_map : 4;
+			u32 texture_srt : 4;
+			u32 texture_coord_gen : 4;
+			u32 tev_swap_table : 1;
+			u32 ind_srt : 2;
+			u32 ind_stage : 3;
+			u32 tev_stage : 5;
+			u32 alpha_compare : 1;
+			u32 blend_mode : 1;
+			u32 channel_control : 1;
+			u32 pad : 1;
+			u32 material_color : 1;
+			u32 pad2 : 4;
+		};
+
+	} flags;
+
+	u8 palette_texture[MAX_TEX_MAP];
+
 	struct TextureMap
 	{
 		u16 tex_index;
@@ -74,6 +112,14 @@ private:
 	};
 	std::vector<TextureSrt> texture_srts;
 
+	struct ChannelControl
+	{
+		u8 color_matsrc;
+		u8 alpha_matsrc;
+	};
+
+	std::optional<ChannelControl> chan_control;
+
 	struct
 	{
 		u8 type, src_factor, dst_factor, logical_op;
@@ -86,12 +132,10 @@ private:
 
 	} alpha_compare;
 
-	union
-	{
+	union {
 		u8 value;
 
-		struct
-		{
+		struct {
 			u8 r : 2;
 			u8 g : 2;
 			u8 b : 2;
