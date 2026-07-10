@@ -47,20 +47,20 @@ void Material::Load(std::istream& file)
 	// texture map
 	for (u32 i = 0; i != flags.texture_map; ++i)
 	{
-		TextureMap map;
+		TextureMap map{};
 		file >> BE >> map.tex_index >> map.wrap_s >> map.wrap_t;
 
-		texture_maps.push_back(std::move(map));
+		texture_maps.push_back(map);
 	}
 
 	// texture srt
 	for (u32 i = 0; i != flags.texture_srt; ++i)
 	{
-		TextureSrt srt;
+		TextureSrt srt{};
 
 		file >> BE >> srt.translate.x >> srt.translate.y >> srt.rotate >> srt.scale.x >> srt.scale.y;
 
-		texture_srts.push_back(std::move(srt));
+		texture_srts.push_back(srt);
 	}
 	//if (!flags.texture_srt)
 	//{
@@ -76,12 +76,12 @@ void Material::Load(std::istream& file)
 	// texture coord gen
 	for (u32 i = 0; i != flags.texture_coord_gen; ++i)
 	{
-		TextureCoordGen coord;
+		TextureCoordGen coord{};
 
 		file >> BE >> coord.tgen_type >> coord.tgen_src >> coord.mtrx_src;
 		file.seekg(1, std::ios::cur);
 
-		texture_coord_gens.push_back(std::move(coord));
+		texture_coord_gens.push_back(coord);
 	}
 	//if (!flags.texture_coord)
 	//{
@@ -170,17 +170,17 @@ void Material::Load(std::istream& file)
 	// tev stage
 	for (u32 i = 0; i != flags.tev_stage; ++i)
 	{
-		TevStage ts;
+		TevStage ts{};
 
 		file.read(ts.data, sizeof(ts.data));
 
-		tev_stages.push_back(std::move(ts));
+		tev_stages.push_back(ts);
 	}
 	if (!flags.tev_stage)
 	{
 		// set up defaults, this seems dumb/wrong
 
-		TevStage tev;
+		TevStage tev{};
 		memset(tev.data, 0, sizeof(tev.data));
 
 		// 1st stage
@@ -196,7 +196,7 @@ void Material::Load(std::istream& file)
 
 		tev.tex_map = 0;
 
-		tev_stages.push_back(std::move(tev));
+		tev_stages.push_back(tev);
 
 		// 2nd stage
 		tev.color_in.a = 0xf;
@@ -273,17 +273,15 @@ void Material::ApplyTextures(const Resources &resources) const {
 		else
 		{
 			if (palette_texture[i] >= resources.palettes[resources.cur_set].size()){
-				throw std::runtime_error{"palette index is out of range"};
+				throw std::runtime_error{"palette index is out of range, requested: " + std::to_string(palette_texture[i])};
 			}
 
 			const auto& name =
 				resources.palettes[resources.cur_set][palette_texture[i]];
 
-			for (u32 n = 0; n < resources.textures.size(); n++)
-			{
-				if (resources.textures[n]->GetName() == name)
-				{
-					resources.textures[n]->Apply(
+			for (auto texture : resources.textures) {
+				if (texture->GetName() == name) {
+					texture->Apply(
 						tlut_name,
 						i,
 						tr.wrap_s,

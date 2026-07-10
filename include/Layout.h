@@ -51,7 +51,7 @@ struct Resources
 class Layout
 {
 public:
-	static const u32 BINARY_MAGIC = MAKE_FOURCC('l', 'y', 't', '1');
+	static constexpr u32 BINARY_MAGIC = MAKE_FOURCC('l', 'y', 't', '1');
 
 	void Load(std::istream& file);
 	~Layout();
@@ -65,10 +65,10 @@ public:
 	void SetLoopStart(FrameNumber loop_start) { frame_loop_start = loop_start; }
 	void SetLoopEnd(FrameNumber loop_end) { frame_loop_end = loop_end; }
 
-	float GetWidth() const { return width; }
+	[[nodiscard]] float GetWidth() const { return width; }
 	void SetWidth(float _width) { width = _width; }
 
-	float GetHeight() const { return height; }
+	[[nodiscard]] float GetHeight() const { return height; }
 	void SetHeight(float _height) { height = _height; }
 
 	//bool GetCentered() const { return !!centered; }
@@ -87,7 +87,7 @@ public:
 	// TODO: move outside of Layout?
 	struct Group
 	{
-		static const u32 BINARY_MAGIC = MAKE_FOURCC('g', 'r', 'p', '1');
+		static constexpr u32 BINARY_MAGIC = MAKE_FOURCC('g', 'r', 'p', '1');
 
 		enum
 		{
@@ -103,10 +103,10 @@ private:
 
 	std::map<std::string, Group> groups;
 
-	FrameNumber frame_current, frame_loop_start, frame_loop_end;
+	FrameNumber frame_current{}, frame_loop_start{}, frame_loop_end{};
 
-	float width, height;
-	u8 centered;
+	float width{}, height{};
+	u8 centered{};
 };
 
 }

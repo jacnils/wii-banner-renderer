@@ -49,8 +49,8 @@ private:
 	char* img_ptr;
 	char* tlut_ptr;
 	u32 tlut_name;
-	u32 tlut_format;
-	u16 tlut_count;
+	u32 tlut_format{};
+	u16 tlut_count{};
 };
 
 class TextureList : public std::vector<Texture*>

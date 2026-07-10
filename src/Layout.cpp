@@ -151,7 +151,7 @@ void Layout::Load(std::istream& file)
 
 			ReadOffsetList<u32>(file, material_count, section_start, [&]
 			{
-				Material* const mat = new Material;
+				auto* const mat = new Material;
 				mat->Load(file);
 				resources.materials.push_back(mat);
 			});
@@ -300,8 +300,7 @@ void Layout::SetLanguage(const std::string& language)
 		{
 			for (auto& pane : group.second.panes)
 			{
-				Pane* const found = FindPane(pane);
-				if (found)
+				if (Pane* const found = FindPane(pane))
 					found->SetHide(true);
 			}
 		}
@@ -317,9 +316,9 @@ void Layout::SetLanguage(const std::string& language)
 }
 
 Texture* Layout::FindTexture(const std::string& find_name) {
-	for(u32 i = 0; i < resources.textures.size(); ++i) {
-		if (find_name == resources.textures[i]->GetName())
-			return resources.textures[i];
+	for(auto & texture : resources.textures) {
+		if (find_name == texture->GetName())
+			return texture;
 	}
 
 	return nullptr;
@@ -338,7 +337,7 @@ void Layout::AddPalette(const std::string& name, u8 key_set) {
 
 
 
-	Texture* texture = new Texture;
+	auto* texture = new Texture;
 	texture->SetName(name);
 
 	std::cout << "Creating texture "

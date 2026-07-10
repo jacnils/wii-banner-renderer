@@ -36,9 +36,9 @@ public:
 	Banner(const std::string& filename);
 	~Banner();
 
-	Layout* GetBanner() const { return layout_banner; }
-	Layout* GetIcon() const { return layout_icon; }
-	Sound* GetSound() const { return sound; }
+	[[nodiscard]] Layout* GetBanner() const { return layout_banner; }
+	[[nodiscard]] Layout* GetIcon() const { return layout_icon; }
+	[[nodiscard]] Sound* GetSound() const { return sound; }
 
 	void LoadBanner();
 	

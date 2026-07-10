@@ -74,7 +74,7 @@ public:
 		u8 data1, data2;
 	};
 
-	KeyData GetFrame(FrameNumber frame_number) const;
+	[[nodiscard]] KeyData GetFrame(FrameNumber frame_number) const;
 
 private:
 	std::map<FrameNumber, KeyData> keys;
@@ -90,7 +90,7 @@ public:
 		float value, slope;
 	};
 
-	float GetFrame(FrameNumber frame_number) const;
+	[[nodiscard]] float GetFrame(FrameNumber frame_number) const;
 
 private:
 	std::multimap<FrameNumber, KeyData> keys;
@@ -110,7 +110,7 @@ public:
 	virtual void SetFrame(FrameNumber frame, u8 key_set);
 
 protected:
-	Animator() {}
+	Animator() = default;
 
 	virtual void ProcessHermiteKey(const KeyType& type, float value);
 	virtual void ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data);

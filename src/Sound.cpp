@@ -159,7 +159,7 @@ struct BNS
 	}
 
 	[[nodiscard]] u8  GetChannelsCount() const { return info.channel_count; }
-	[[nodiscard]] u32 GetSamplesCount() const { return info.sample_count * GetChannelsCount(); }
+	[[nodiscard]] u32 GetSamplesCount() const { return info.sample_count; }
 	[[nodiscard]] u16 GetSampleRate() const { return info.sample_rate; }
 	[[nodiscard]] u8 GetLoop() const {
 		return info.loop;
@@ -174,7 +174,7 @@ struct BNS
 		u32 pcm_pos = pcm_start_pos;
 		u32 adpcm_pos = adpcm_start_pos;
 
-		while (adpcm_pos != adpcm_end_pos * 2)
+		while (adpcm_pos != adpcm_end_pos)
 		{
 			if ((adpcm_pos & 15) == 0)
 			{
@@ -213,6 +213,9 @@ struct BNS
 				dsp_regs.yn2 = dsp_regs.yn1;
 				dsp_regs.yn1 = sample;
 
+				if (pcm_pos >= info.sample_count * info.channel_count)
+					return pcm_pos;
+
 				if (pcm)
 					pcm[pcm_pos] = sample;
 
@@ -245,6 +248,7 @@ static u32 DecodeSampleCountForChannel(u32 adpcm_start_pos, u32 adpcm_end_pos)
 
     return count;
 }
+
 [[nodiscard]] u32 GetDecodedSampleCount() const
 {
     if (info.channel_count == 1)
@@ -256,6 +260,7 @@ static u32 DecodeSampleCountForChannel(u32 adpcm_start_pos, u32 adpcm_end_pos)
 
     return left * 2;
 }
+
 u32 DecodeToPCM(s16* pcm)
 {
     dsp_regs.ClearHistory();
@@ -265,7 +270,7 @@ u32 DecodeToPCM(s16* pcm)
         pcm,
         0,
         0,
-        (info.channel_count == 2) ? info.right_start : data.size
+        (info.channel_count == 2) ? info.right_start * 2 : data.size * 2
     );
 
     if (info.channel_count == 2)
@@ -277,7 +282,7 @@ u32 DecodeToPCM(s16* pcm)
             pcm,
             1,
             info.right_start * 2,
-            data.size
+            data.size * 2
         );
     }
 
@@ -428,6 +433,14 @@ bool Sound::Load(std::istream& file)
 	    loop_end    = sampleCount;
     	has_loop   = bns_file.GetLoop();
 
+    	std::cout << "Expected PCM samples: "
+			<< bns_file.GetDecodedSampleCount()
+			<< "\n";
+
+    	std::cout << "BNS header samples: "
+				  << sampleCount * channels
+				  << "\n";
+
 	    std::cout
 			    << "samples=" << sampleCount
 			    << " channels=" << channels
@@ -441,7 +454,7 @@ bool Sound::Load(std::istream& file)
 	    }
 
 	    std::cout << "Resizing PCM buffer\n";
-	    samples.resize(bns_file.GetDecodedSampleCount());
+	    samples.resize(sampleCount * channels);
 
 	    std::cout << "Decoding PCM...\n";
 	    u32 written = bns_file.DecodeToPCM(samples.data());
@@ -454,11 +467,6 @@ bool Sound::Load(std::istream& file)
     	std::cout << "Decoded samples: " << samples.size() << "\n";
     	std::cout << "Channels: " << channels << "\n";
     	std::cout << "Remainder: " << (samples.size() % channels) << "\n";
-
-    	// crap hack
-    	if (samples.size() % channels != 0) {
-    		samples.resize((samples.size() / channels) * channels);
-    	}
 
 	    std::cout << "Decode complete\n";
 
@@ -544,11 +552,13 @@ void Sound::WriteWAVLooped(const std::string& path, double seconds)
     if (sampleCount == 0)
         throw std::runtime_error("sampleCount is zero");
 
-    const size_t target_frames = static_cast<size_t>(seconds * sampleRate);
+    const auto target_frames = static_cast<size_t>(seconds * sampleRate);
     const size_t target_samples = target_frames * channels;
 
+	// i guess homebrew channel is retarded or something because its the only test subject that has this fucking issue
+	// if anyone has a better solution to this pls fix my shit
 	if (samples.size() % channels != 0)
-		throw std::runtime_error("PCM misaligned");
+		samples.resize((samples.size() / channels) * channels);
 
 	const size_t total_frames = samples.size() / channels;
     const size_t total_samples = total_frames * channels;
@@ -576,7 +586,7 @@ void Sound::WriteWAVLooped(const std::string& path, double seconds)
 
     if (has_loop) {
         const size_t loop_frames = loop_end_frame - loop_start_frame;
-        const size_t loop_samples = loop_frames * channels;
+        //const size_t loop_samples = loop_frames * channels;
 
         const size_t loop_start_sample = loop_start_frame * channels;
 

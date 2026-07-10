@@ -50,15 +50,15 @@ public:
 
 	void Load(std::istream& file);
 	Material() {
-		for( int i = 0; i < 8; i++ )
-			palette_texture[i] = PALETTE_DEFAULT;
+		for(unsigned char & i : palette_texture)
+			i = PALETTE_DEFAULT;
 	}
 	void Apply(const Resources& resources) const;
 	void ApplyTextures(const Resources& resources) const;
 
 protected:
-	void ProcessHermiteKey(const KeyType& type, float value);
-	void ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data);
+	void ProcessHermiteKey(const KeyType& type, float value) override;
+	void ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data) override;
 
 private:
 	union
@@ -82,9 +82,9 @@ private:
 			u32 pad2 : 4;
 		};
 
-	} flags;
+	} flags{};
 
-	u8 palette_texture[MAX_TEX_MAP];
+	u8 palette_texture[MAX_TEX_MAP]{};
 
 	struct TextureMap
 	{
@@ -112,25 +112,17 @@ private:
 	};
 	std::vector<TextureSrt> texture_srts;
 
-	struct ChannelControl
-	{
-		u8 color_matsrc;
-		u8 alpha_matsrc;
-	};
-
-	std::optional<ChannelControl> chan_control;
-
 	struct
 	{
 		u8 type, src_factor, dst_factor, logical_op;
 
-	} blend_mode;
+	} blend_mode{};
 
 	struct
 	{
 		u8 function, op, ref0, ref1;
 
-	} alpha_compare;
+	} alpha_compare{};
 
 	union {
 		u8 value;
@@ -142,7 +134,7 @@ private:
 			u8 a : 2;
 		};
 
-	} tev_swap_table[4];
+	} tev_swap_table[4]{};
 
 	union TevStage
 	{
@@ -200,16 +192,16 @@ private:
 	};
 	std::vector<TevStage> tev_stages;
 
-	GXColor color;	// TODO: where is "color" used?
+	GXColor color{};	// TODO: where is "color" used?
 
-	GXColorS10 color_regs[3];
-	GXColor color_constants[4];
+	GXColorS10 color_regs[3]{};
+	GXColor color_constants[4]{};
 };
 
 class MaterialList : public std::vector<Material*>
 {
 public:
-	static const u32 BINARY_MAGIC = MAKE_FOURCC('m', 'a', 't', '1');
+	static constexpr u32 BINARY_MAGIC = MAKE_FOURCC('m', 'a', 't', '1');
 };
 
 }
