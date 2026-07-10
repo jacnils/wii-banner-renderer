@@ -213,14 +213,6 @@ void Texture::Apply(u8& tlutName, u8 map_id, u8 wrap_s, u8 wrap_t) const {
 
 	GXTexObj tmpTexObj = texobj;
 
-	printf(
-	"Apply tex %s img=%p tlut=%p map=%u\n",
-	name.c_str(),
-	img_ptr,
-	tlut_ptr,
-	map_id
-	);
-
 	if (tlut_ptr)
 	{
 		GXTlutObj tlutobj;
