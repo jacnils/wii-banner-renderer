@@ -54,7 +54,7 @@ public:
 	void Load(std::istream& file);
 	virtual ~Pane();
 
-	void Render(const Resources& resources, u8 parent_alpha, Vec2f adjust) const;
+	void Render(const Resources& resources, u8 parent_alpha, bool widescreen) const;
 	void SetFrame(FrameNumber frame, u8 key_set);
 
 	bool GetVisible() const { return GetBit(flags, FLAG_VISIBLE); }
@@ -99,7 +99,7 @@ protected:
 	void ProcessStepKey(const KeyType& type, StepKeyHandler::KeyData data);
 
 private:
-	virtual void Draw(const Resources&, u8, Vec2f) const {};
+	virtual void Draw(const Resources&, u8) const {};
 
 	enum : u8
 	{
@@ -139,7 +139,7 @@ protected:
 
 	void ProcessHermiteKey(const KeyType& type, float value);
 
-	void Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const;
+	void Draw(const Resources& resources, u8 render_alpha) const;
 
 private:
 	struct TexCoords

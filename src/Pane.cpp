@@ -66,39 +66,45 @@ void Pane::SetFrame(FrameNumber frame, u8 key_set)
 		pane->SetFrame(frame, key_set);
 }
 
-void Pane::Render(const Resources& resources, u8 parent_alpha, Vec2f adjust) const
-{
+void Pane::Render(const Resources& resources, u8 parent_alpha, bool widescreen) const {
 	if (!GetVisible() || GetHide())
 		return;
 
-	// TODO: is this handled correctly?
-	const u8 render_alpha = GetInfluencedAlpha() ? MultiplyColors(parent_alpha, GetAlpha()) : GetAlpha();
+	u8 render_alpha =
+		GetInfluencedAlpha()
+			? MultiplyColors(parent_alpha, GetAlpha())
+			: GetAlpha();
+
+	// kinda copied from usb loader gx
+	float ws_scale = 1.f;
+
+	if (widescreen) {
+		ws_scale = 0.82f;
+		widescreen = false;
+	}
 
 	glPushMatrix();
 
-	// position
-	glTranslatef(GetTranslate().x * adjust.x, GetTranslate().y * adjust.y, GetTranslate().z);
+	glTranslatef(
+		GetTranslate().x,
+		GetTranslate().y,
+		GetTranslate().z
+	);
 
-	if (!GetPositionAdjust())
-	{
-		adjust.x = 1.f;
-		adjust.y = 1.f;
-	}
+	glRotatef(GetRotate().z, 0, 0, 1);
+	glRotatef(GetRotate().y, 0, 1, 0);
+	glRotatef(GetRotate().x, 1, 0, 0);
 
-	// rotate
-	glRotatef(GetRotate().x, 1.f, 0.f, 0.f);
-	glRotatef(GetRotate().y, 0.f, 1.f, 0.f);
-	glRotatef(GetRotate().z, 0.f, 0.f, 1.f);
+	glScalef(
+		GetScale().x * ws_scale,
+		GetScale().y,
+		1.f
+	);
 
-	// scale
-	glScalef(GetScale().x, GetScale().y, 1.f);
+	Draw(resources, render_alpha);
 
-	// render self
-	Draw(resources, render_alpha, adjust);
-
-	// render children
 	for (Pane* pane : panes)
-		pane->Render(resources, render_alpha, adjust);
+		pane->Render(resources, render_alpha, widescreen);
 
 	glPopMatrix();
 }
@@ -185,22 +191,23 @@ void Quad::Load(std::istream& file)
 		ReadBEArray(file, &tex_coords[0].coords->s, sizeof(TexCoords) / sizeof(float) * tex_coord_count);
 }
 
-void Quad::Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const
+	void Quad::Draw(const Resources& resources, u8 render_alpha) const
 {
 	if (material_index < resources.materials.size())
 		resources.materials[material_index]->Apply(resources);
 
-	// go lambda
-	auto const quad_vertex = [=](unsigned int v, float x, float y)
+	auto quad_vertex = [=](unsigned int v, float x, float y)
 	{
-		// color
-		glColor4ub(vertex_colors[v].r, vertex_colors[v].g, vertex_colors[v].b,
-			MultiplyColors(vertex_colors[v].a, render_alpha));	// apply alpha
+		glColor4ub(
+			vertex_colors[v].r,
+			vertex_colors[v].g,
+			vertex_colors[v].b,
+			MultiplyColors(vertex_colors[v].a, render_alpha)
+		);
 
-		// tex coords
-		if (1 == tex_coords.size())
+		if (tex_coords.size() == 1)
 		{
-			auto* const fv = &tex_coords.front().coords[v].s;
+			auto* fv = &tex_coords.front().coords[v].s;
 			for (GLenum t = GL_TEXTURE0; t != GL_TEXTURE8; ++t)
 				glMultiTexCoord2fv(t, fv);
 		}
@@ -211,23 +218,30 @@ void Quad::Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const
 				glMultiTexCoord2fv(target++, &tc.coords[v].s);
 		}
 
-		// position
 		glVertex2f(x, y);
 	};
 
 	glPushMatrix();
 
-	// size
-	glScalef(GetWidth() * adjust.x, GetHeight() * adjust.y, 1.f);
+	glScalef(
+		GetWidth(),
+		GetHeight(),
+		1.f
+	);
 
-	// origin
-	glTranslatef(-0.5f * GetOriginX(), -0.5f * GetOriginY(), 0.f);
+	glTranslatef(
+		-0.5f * GetOriginX(),
+		-0.5f * GetOriginY(),
+		1.f
+	);
 
 	glBegin(GL_QUADS);
+
 	quad_vertex(2, 0.f, 0.f);
 	quad_vertex(3, 1.f, 0.f);
 	quad_vertex(1, 1.f, 1.f);
 	quad_vertex(0, 0.f, 1.f);
+
 	glEnd();
 
 	glPopMatrix();

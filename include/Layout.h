@@ -55,7 +55,9 @@ public:
 	void Load(std::istream& file);
 	~Layout();
 
-	void Render(float aspect_ratio, float zoom = 1.f) const;
+	//void Render(float aspect_ratio, float zoom = 1.f) const;
+	void Render(float zoom, u8 render_alpha, bool widescreen) const;
+
 
 	[[nodiscard]] FrameNumber GetFrame() const { return frame_current; }
 	void SetFrame(FrameNumber frame_number);

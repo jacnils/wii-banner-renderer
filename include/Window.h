@@ -39,7 +39,7 @@ public:
 	void Load(std::istream& file);
 
 private:
-	void Draw(const Resources& resources, u8 render_alpha, Vec2f adjust) const;
+	void Draw(const Resources& resources, u8 render_alpha) const;
 
 	struct
 	{

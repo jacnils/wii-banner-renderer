@@ -43,6 +43,7 @@ struct Settings {
 	bool save_frames = false; // save frames? (wastes your time, useful for debugging)
 	int frames_to_save = -1; // -1 = save all frames iterated through
 	bool no_audio = false; // no audio, for debugging
+	bool no_crop = false; // no crop, for debugging
 
 	void print_settings() const {
 		std::cout << "FPS: " << fps << "\n";
@@ -50,6 +51,8 @@ struct Settings {
 		std::cout << "Maximum length: " << (maximum_length == -1 ? "No limit" : std::to_string(maximum_length)) << " sec\n";
 		std::cout << "Save frames: " << save_frames << "\n";
 		std::cout << "Frames to save (if enabled): " << (frames_to_save == -1 ? "all" : std::to_string(frames_to_save)) << "\n";
+		std::cout << "No audio: " << no_audio << "\n";
+		std::cout << "No crop: " << no_crop << "\n";
 	}
 };
 
@@ -90,6 +93,31 @@ private:
 	FILE* ptr{nullptr};
 
 };
+
+std::string get_crop(const std::vector<Vec2f>& points) {
+	if (points.empty())
+		return "";
+
+	float min_x = points[0].x;
+	float max_x = points[0].x;
+	float min_y = points[0].y;
+	float max_y = points[0].y;
+
+	for (const auto& p : points)
+	{
+		min_x = std::min(min_x, p.x);
+		max_x = std::max(max_x, p.x);
+		min_y = std::min(min_y, p.y);
+		max_y = std::max(max_y, p.y);
+	}
+
+	float width  = max_x - min_x;
+	float height = max_y - min_y;
+
+	std::ostringstream ss;
+	ss << width << ":" << height << ":" << min_x << ":" << min_y;
+	return ss.str();
+}
 
 int process(const std::string& input_opening, Settings settings = {}) {
 	std::string opening = input_opening;
@@ -159,6 +187,11 @@ int process(const std::string& input_opening, Settings settings = {}) {
 		audio_param = "-i " "\"" + base_filename + ".wav" + "\"" " ";
 	}
 
+	std::string crop;
+	if (!settings.no_crop) {
+		crop = "-vf \"crop=827:403:1026:0,scale=trunc(iw/2)*2:trunc(ih/2)*2\" ";
+	}
+
 	ProcPtr ffmpeg{
 		"ffmpeg -y "
 	"-f rawvideo "
@@ -166,23 +199,15 @@ int process(const std::string& input_opening, Settings settings = {}) {
 	"-pixel_format rgba "
 	"-video_size 1920x1080 "
 	"-framerate " + std::to_string(settings.fps) + " "
-	"-i - " + audio_param + "-t " + std::to_string(runtime) + " "
-	"-vf \"crop=933:403:970:545,scale=trunc(iw/2)*2:trunc(ih/2)*2\" "
+	"-i - " + audio_param + "-t " + std::to_string(runtime) + " " + crop +
 	"-c:v libx264 "
 	"-pix_fmt yuv420p "
 	"-c:a aac "
-	//"-shortest "
 	"\"" + base_filename + ".mp4" + "\"", "w"};
-
 
     for (int i = 0; i < settings.fps * runtime; i++) {
     	renderer.BeginFrame();
-
-		banner.GetBanner()->Render(
-    		16.0f / 9.0f,
-    		596.0f / 608.0f
-		);
-
+    	banner.GetBanner()->Render(1.0f, 0xff, true);
 		renderer.EndFrame();
 
 		if (settings.save_frames && settings.frames_to_save <= i && settings.frames_to_save >= 0) {
@@ -220,7 +245,7 @@ static std::string trim(const std::string& s) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-m|-min int|-max int|-s int\n";
+        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-m|-nc|-min int|-max int|-s int\n";
         return EXIT_FAILURE;
     }
 
@@ -247,6 +272,10 @@ int main(int argc, char** argv) {
 		if (arg == "-m") {
 			// mute
 			settings.no_audio = true;
+		}
+		if (arg == "-nc") {
+			// no crop
+			settings.no_crop = true;
 		}
 
 		if (arg == "-s") {

@@ -236,28 +236,28 @@ Layout::~Layout()
 		delete font;
 }
 
-void Layout::Render(float aspect_ratio, float zoom) const
-{
-
-	// TODO: make this work good :p
-	Vec2f adjust;
-	adjust.x = aspect_ratio / 4 * 3;
-	adjust.y = 1.f;
-
+void Layout::Render(float zoom, u8 render_alpha, bool widescreen) const {
 	glPushMatrix();
 
-	//glOrtho(0.f, width * adjust.x, 0.f, height * adjust.y, -1000.f, 1000.f);
-	// assuming always centered, hope this isn't an issue
-	//glTranslatef(width / 2 * adjust.x, height / 2 * adjust.y, 0.f);
+	glScalef(
+		zoom / width,
+		-zoom / height,
+		1.f
+	);
 
-	glTranslatef(0.5, 0.5, 0);
-	glScalef(zoom / (width * adjust.x), -zoom / (height * adjust.y), 1.f);
-
-	//glScalef(zoom, zoom, 1.f);
-
-	for (Pane* pane : panes) {
-		pane->Render(resources, 0xff, adjust);
+	if (centered) {
+		glTranslatef(
+			width * 0.5f,
+			height * 0.5f,
+			0.f
+		);
 	}
+
+	for (Pane* pane : panes)
+	{
+		pane->Render(resources, render_alpha, widescreen);
+	}
+
 	glPopMatrix();
 }
 
