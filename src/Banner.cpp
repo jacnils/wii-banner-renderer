@@ -49,6 +49,31 @@ enum BinaryMagic : u32
 	BINARY_MAGIC_PANE_ANIMATION_INFO = MAKE_FOURCC('p', 'a', 'i', '1')
 };
 
+	bool Banner::is_valid(const std::string& filename) {
+		std::ifstream bnr_file(filename, std::ios::binary | std::ios::in);
+		// opening.bnr  archives have 0x600 byte headers
+		// 00000000.app archives have 0x640 byte headers
+		auto header_bytes = 0x600;
+
+		bnr_file.seekg(header_bytes, std::ios::cur);
+
+		// lets see if this is an opening.bnr
+		FourCC magic;
+		bnr_file >> magic;
+		if (magic != BINARY_MAGIC_U8_ARCHIVE) {
+			// lets see if it's a 00000000.app
+			bnr_file.seekg(60, std::ios::cur);
+			bnr_file >> magic;
+
+			if (magic != BINARY_MAGIC_U8_ARCHIVE)
+				return false;
+
+			header_bytes = 0x640;
+		}
+
+		return true;
+	}
+
 Banner::Banner(const std::string& _filename)
 	: layout_banner(nullptr)
 	, layout_icon(nullptr)
