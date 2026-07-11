@@ -145,7 +145,27 @@ void Material::Load(std::istream& file)
 		// TODO: read des guys
 		//file >> BE >> translate.x >> translate.y >> rotate >> scale.x >> scale.y;
 
-		file.seekg(5 * 4, std::ios::cur);
+		for (u32 i = 0; i != flags.ind_srt; ++i)
+		{
+			IndSrt srt{};
+
+			file >> BE
+				 >> srt.translate_s
+				 >> srt.translate_t
+				 >> srt.scale_s
+				 >> srt.scale_t
+				 >> srt.rotate;
+
+			std::cout << "IndSrt: "
+		  << srt.translate_s << ", "
+		  << srt.translate_t << ", "
+		  << srt.scale_s << ", "
+		  << srt.scale_t << ", "
+		  << srt.rotate << '\n';
+
+			ind_srts.push_back(srt);
+		}
+
 
 		//std::cout << "ind_texture: SRT\n";
 	}
@@ -412,7 +432,7 @@ void Material::ProcessHermiteKey(const KeyType& type, float value)
 	}
 	else if (type.type == ANIMATION_TYPE_IND_MATERIAL)	// ind texture crap TODO REALLY FIX THIS SHIT
 	{
-		if (type.target < 5) //&& type.index < ind_srts.size())
+		if (type.target < 5 && type.index < flags.ind_srt) //&& type.index < ind_srts.size())
 		{
 			std::cout << "ANIMATION_TYPE_IND_MATERIAL not supported yet, todo fix this shit";
 			//(&ind_srts[type.index].translate_x)[type.target] = value;

@@ -131,12 +131,28 @@ int process(const std::string& input_opening, Settings settings = {}) {
 			return EXIT_FAILURE;
 		}
 		extract_wad(in, "tmp");
-		if (!std::filesystem::is_regular_file("tmp/00000000.app")) {
-			std::cerr << "Invalid/unsupported input file. It is possible that it is structured differently.\n";
-			return EXIT_FAILURE;
+
+		for (const auto& entry : std::filesystem::directory_iterator("tmp"))
+		{
+			if (!entry.is_regular_file())
+				continue;
+
+			if (entry.path().extension() != ".app")
+				continue;
+
+			const std::string path = entry.path().string();
+
+			if (WiiBanner::Banner::is_valid(path)) {
+				opening = path;
+				break;
+			}
 		}
 
-		opening = "tmp/00000000.app";
+		if (opening.empty())
+		{
+			std::cerr << "No valid .app file found, probably invalid .wad\n";
+			return EXIT_FAILURE;
+		}
 	}
 
 	std::string base_filename = std::filesystem::path(input_opening).filename().string();

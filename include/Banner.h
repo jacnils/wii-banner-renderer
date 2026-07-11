@@ -51,6 +51,8 @@ public:
 
 	void LoadSound();
 
+	static bool is_valid(const std::string& filename);
+
 	void UnloadBanner() { delete layout_banner; layout_banner = nullptr; }
 	void UnloadIcon() { delete layout_icon; layout_icon = nullptr; }
 	void UnloadSound() { delete sound; sound = nullptr; }

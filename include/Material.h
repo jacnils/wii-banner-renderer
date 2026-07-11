@@ -136,6 +136,16 @@ private:
 
 	} tev_swap_table[4]{};
 
+	struct IndSrt {
+		float translate_s;
+		float translate_t;
+		float scale_s;
+		float scale_t;
+		float rotate;
+	};
+
+	std::vector<IndSrt> ind_srts;
+
 	union TevStage
 	{
 		char data[0x10];
