@@ -44,9 +44,11 @@ struct Settings {
 	int frames_to_save = -1; // -1 = save all frames iterated through
 	bool no_audio = false; // no audio, for debugging
 	bool no_crop = false; // no crop, for debugging
+	bool icon = false; // icon, self explanatory
 
 	void print_settings() const {
 		std::cout << "FPS: " << fps << "\n";
+		std::cout << "Icon: " << icon << "\n";
 		std::cout << "Minimum length: " << (minimum_length == -1 ? "No limit" : std::to_string(minimum_length)) << " sec\n";
 		std::cout << "Maximum length: " << (maximum_length == -1 ? "No limit" : std::to_string(maximum_length)) << " sec\n";
 		std::cout << "Save frames: " << save_frames << "\n";
@@ -165,12 +167,22 @@ int process(const std::string& input_opening, Settings settings = {}) {
 
     WiiBanner::Banner banner(opening);
 
-    banner.LoadBanner();
+	if (settings.icon) {
+		banner.LoadIconA();
+		settings.no_audio = true; // im torn about this one
+	} else {
+		banner.LoadBanner();
+	}
 
 	if (!settings.no_audio)
 		banner.LoadSound();
 
-    banner.GetBanner()->SetLanguage("ENG");
+	WiiBanner::Layout* layout = settings.icon ? banner.GetIcon() : banner.GetBanner();
+	if (!layout) {
+		throw std::runtime_error{"layout == nullptr"};
+	}
+
+    layout->SetLanguage("ENG");
 
 	if (!settings.no_audio) {
 		if (!banner.GetSound()) {
@@ -223,7 +235,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
 
     for (int i = 0; i < settings.fps * runtime; i++) {
     	renderer.BeginFrame();
-    	banner.GetBanner()->Render(1.0f, 0xff, true);
+    	layout->Render(1.0f, 0xff, true);
 		renderer.EndFrame();
 
 		if (settings.save_frames && settings.frames_to_save <= i && settings.frames_to_save >= 0) {
@@ -234,7 +246,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
   		}
 
   		renderer.ReadPixelsTo(ffmpeg.get());
-    	banner.GetBanner()->AdvanceFrame();
+    	layout->AdvanceFrame();
     }
 
     banner.UnloadBanner();
@@ -292,6 +304,9 @@ int main(int argc, char** argv) {
 		if (arg == "-nc") {
 			// no crop
 			settings.no_crop = true;
+		}
+		if (arg == "-i") {
+			settings.icon = true;
 		}
 
 		if (arg == "-s") {
