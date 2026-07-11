@@ -31,6 +31,8 @@ distribution.
 #include <iostream>
 #include <filesystem>
 #include <cmath>
+#include <algorithm>
+#include <array>
 
 #include "Banner.h"
 #include "Renderer.h"
@@ -96,29 +98,44 @@ private:
 
 };
 
-std::string get_crop(const std::vector<Vec2f>& points) {
-	if (points.empty())
-		return "";
+struct Point {
+	int x;
+	int y;
+};
 
-	float min_x = points[0].x;
-	float max_x = points[0].x;
-	float min_y = points[0].y;
-	float max_y = points[0].y;
+struct CropPoints {
+	int width;
+	int height;
+	int x;
+	int y;
+};
 
-	for (const auto& p : points)
-	{
+CropPoints GetCrop(const std::array<Point, 4>& pts) {
+	int min_x = pts[0].x;
+	int max_x = pts[0].x;
+	int min_y = pts[0].y;
+	int max_y = pts[0].y;
+
+	for (const auto& p : pts) {
 		min_x = std::min(min_x, p.x);
 		max_x = std::max(max_x, p.x);
 		min_y = std::min(min_y, p.y);
 		max_y = std::max(max_y, p.y);
 	}
 
-	float width  = max_x - min_x;
-	float height = max_y - min_y;
+	return {
+		max_x - min_x,
+		max_y - min_y,
+		min_x,
+		min_y
+	};
+}
 
-	std::ostringstream ss;
-	ss << width << ":" << height << ":" << min_x << ":" << min_y;
-	return ss.str();
+std::string ToFFmpegCrop(const CropPoints& c) {
+	return "crop=" + std::to_string(c.width) + ":" +
+					 std::to_string(c.height) + ":" +
+					 std::to_string(c.x) + ":" +
+					 std::to_string(c.y);
 }
 
 int process(const std::string& input_opening, Settings settings = {}) {
@@ -217,7 +234,23 @@ int process(const std::string& input_opening, Settings settings = {}) {
 
 	std::string crop;
 	if (!settings.no_crop) {
-		crop = "-vf \"crop=827:403:1026:0,scale=trunc(iw/2)*2:trunc(ih/2)*2\" ";
+		std::array<Point, 4> points = {{
+			{1026, 0}, // top left
+			{1026, 403}, // bottom left
+		{1853, 0}, // top right
+			{1853, 403}, // bottom right
+		}};
+
+		std::array<Point, 4> points_icon = {{
+			{1046, 0}, // top left
+			{1046, 594}, // bottom left
+			{1833, 0}, // top right
+			{1833, 594} // bottom right
+		}};
+
+		crop = "-vf \"";
+		crop += ToFFmpegCrop(settings.icon ? GetCrop(points_icon) : GetCrop(points));
+		crop += ",scale=trunc(iw/2)*2:trunc(ih/2)*2\" ";
 	}
 
 	ProcPtr ffmpeg{
@@ -238,7 +271,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
     	layout->Render(1.0f, 0xff, true);
 		renderer.EndFrame();
 
-		if (settings.save_frames && settings.frames_to_save <= i && settings.frames_to_save >= 0) {
+		if (settings.save_frames && settings.frames_to_save && i <= settings.frames_to_save) {
 			char filename[64];
 			sprintf(filename, "output-%04d.png", i);
 
