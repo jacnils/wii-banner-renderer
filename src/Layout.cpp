@@ -269,6 +269,8 @@ void Layout::SetFrame(FrameNumber frame_number)
 	if (key_set)
 		frame_number -= frame_loop_start;
 
+	resources.cur_set = key_set;
+
 	for (Pane* pane : panes)
 		pane->SetFrame(frame_number, key_set);
 
@@ -280,7 +282,6 @@ void Layout::AdvanceFrame()
 {
 	++frame_current;
 
-	// should i just use == ?
 	if (frame_current >= frame_loop_end)
 		frame_current = frame_loop_start;
 

@@ -290,20 +290,27 @@ void Material::ApplyTextures(const Resources &resources) const {
 					tr.wrap_t
 				);
 		}
-		else
-		{
+		else {
+			if (palette_texture[i] == PALETTE_DEFAULT)
+				continue;
 
-			if (resources.cur_set >= resources.palettes.size())
-				throw std::runtime_error("invalid palette set");
+			u8 palette_set = resources.cur_set;
 
-			if (palette_texture[i] >= resources.palettes[resources.cur_set].size()){
-				//throw std::runtime_error{"palette index is out of range, requested: " + std::to_string(palette_texture[i])};
-				// just warn for now and move on
-				std::cerr << "Warning: Palette index out of range, likely due to unimplemented feature. Skipping. Some textures will not be visible.\n";
+			if (palette_set >= resources.palettes.size()) {
+				palette_set = 0; // fallback, this is a hack
+			}
+
+			auto& palettes = resources.palettes.at(palette_set);
+
+			if (palette_texture[i] >= palettes.size()) {
+				std::cerr
+					<< "Palette index out of range: "
+					<< static_cast<int>(palette_texture[i])
+					<< "\n";
 				return;
 			}
-			const auto& name =
-				resources.palettes[resources.cur_set][palette_texture[i]];
+
+			const auto& name = palettes[palette_texture[i]];
 
 			for (auto texture : resources.textures) {
 				if (texture->GetName() == name) {

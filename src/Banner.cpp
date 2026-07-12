@@ -191,11 +191,12 @@ Layout* Banner::LoadLayout(const std::string& lyt_name, std::streamoff offset, V
 	// load animations
 	FrameNumber length_start = 0, length_loop = 0;
 
-	auto const brlan_start_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Start.brlan");
+	auto brlan_start_offset = bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_Start.brlan");
 
 	// alt. start file
 	if (!brlan_start_offset) {
-		bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_In.brlan");
+		brlan_start_offset =
+				bin_arc.GetFileOffset("arc/anim/" + lyt_name + "_In.brlan");
 	}
 
 	if (brlan_start_offset) {
