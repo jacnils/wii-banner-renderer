@@ -38,6 +38,9 @@ distribution.
 #include "Renderer.h"
 #include "Wad.h"
 
+constexpr int VIDEO_WIDTH = 1920;
+constexpr int VIDEO_HEIGHT = 1080;
+
 struct Settings {
 	int fps = 60; // fps to render at
 	int minimum_length = 10; // min seconds
@@ -47,6 +50,7 @@ struct Settings {
 	bool no_audio = false; // no audio, for debugging
 	bool no_crop = false; // no crop, for debugging
 	bool icon = false; // icon, self explanatory
+	double resolution_multiplier = 1; // resolution multiplier
 
 	void print_settings() const {
 		std::cout << "FPS: " << fps << "\n";
@@ -57,6 +61,7 @@ struct Settings {
 		std::cout << "Frames to save (if enabled): " << (frames_to_save == -1 ? "all" : std::to_string(frames_to_save)) << "\n";
 		std::cout << "No audio: " << no_audio << "\n";
 		std::cout << "No crop: " << no_crop << "\n";
+		std::cout << "Resolution multiplier: " << resolution_multiplier << "\n";
 	}
 };
 
@@ -99,8 +104,8 @@ private:
 };
 
 struct Point {
-	int x;
-	int y;
+	double x;
+	double y;
 };
 
 struct CropPoints {
@@ -111,10 +116,10 @@ struct CropPoints {
 };
 
 constexpr CropPoints GetCrop(const std::array<Point, 4>& pts) {
-	int min_x = pts[0].x;
-	int max_x = pts[0].x;
-	int min_y = pts[0].y;
-	int max_y = pts[0].y;
+	double min_x = pts[0].x;
+	double max_x = pts[0].x;
+	double min_y = pts[0].y;
+	double max_y = pts[0].y;
 
 	for (const auto& p : pts) {
 		min_x = std::min(min_x, p.x);
@@ -124,10 +129,10 @@ constexpr CropPoints GetCrop(const std::array<Point, 4>& pts) {
 	}
 
 	return {
-		max_x - min_x,
-		max_y - min_y,
-		min_x,
-		min_y
+		static_cast<int>(max_x - min_x),
+		static_cast<int>(max_y - min_y),
+		static_cast<int>(min_x),
+		static_cast<int>(min_y)
 	};
 }
 
@@ -180,7 +185,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
 		base_filename = base_filename.substr(0, ext);
 	}
 
-    Renderer renderer(1920, 1080);
+    Renderer renderer(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier), static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier));
 
     WiiBanner::Banner banner(opening);
 
@@ -235,17 +240,17 @@ int process(const std::string& input_opening, Settings settings = {}) {
 	std::string crop;
 	if (!settings.no_crop) {
 		std::array<Point, 4> points = {{
-			{1026, 0}, // top left
-			{1026, 403}, // bottom left
-		{1853, 0}, // top right
-			{1853, 403}, // bottom right
+			{1026 * settings.resolution_multiplier, 0 * settings.resolution_multiplier}, // top left
+			{1026 * settings.resolution_multiplier, 403 * settings.resolution_multiplier}, // bottom left
+		{1853 * settings.resolution_multiplier, 0 * settings.resolution_multiplier}, // top right
+			{1853 * settings.resolution_multiplier, 403 * settings.resolution_multiplier}, // bottom right
 		}};
 
 		std::array<Point, 4> points_icon = {{
-			{1046, 0}, // top left
-			{1046, 594}, // bottom left
-			{1833, 0}, // top right
-			{1833, 594} // bottom right
+			{1046 * settings.resolution_multiplier, 0 * settings.resolution_multiplier}, // top left
+			{1046 * settings.resolution_multiplier, 594 * settings.resolution_multiplier}, // bottom left
+			{1833 * settings.resolution_multiplier, 0 * settings.resolution_multiplier}, // top right
+			{1833 * settings.resolution_multiplier, 594 * settings.resolution_multiplier} // bottom right
 		}};
 
 		crop = "-vf \"";
@@ -258,7 +263,8 @@ int process(const std::string& input_opening, Settings settings = {}) {
 	"-f rawvideo "
 	"-loglevel error "
 	"-pixel_format rgba "
-	"-video_size 1920x1080 "
+	//"-video_size VIDEO_WIDTHxVIDEO_HEIGHT "
+	"-video_size " + std::to_string(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier)) + "x" + std::to_string(static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier)) + " "
 	"-framerate " + std::to_string(settings.fps) + " "
 	"-i - " + audio_param + "-t " + std::to_string(runtime) + " " + crop +
 	"-c:v libx264 "
@@ -275,7 +281,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
 			char filename[64];
 			sprintf(filename, "output-%04d.png", i);
 
-			renderer.SavePNG(filename, 1920, 1080);
+			renderer.SavePNG(filename, static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier), static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier));
   		}
 
   		renderer.ReadPixelsTo(ffmpeg.get());
@@ -307,13 +313,15 @@ static std::string trim(const std::string& s) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> <optional arguments>\n";
-    	std::cout << "-w/--prompt:                 Ask for input files instead of checking parameters. Useful for building in IDEs.\n";
-    	std::cout << "-m/--mute:                   Do not retrieve the audio data. Output video will be silent.\n";
-    	std::cout << "-nc/--no-crop:               Do not crop to the Wii's visible area. Only recommended for debugging.\n";
-    	std::cout << "-i/--icon:                   Output the channel's icon, instead of banner.\n";
-    	std::cout << "-s/--save <int>:             Save frames as images. Optional integer following it will be the limit, otherwise all frames will be saved.\n";
-    	std::cout << "-min/--minimum-length <int>: Minimum length of the output video. Default is 10 seconds, 0 is the length of the audio track.\n";
-    	std::cout << "-max/--maximum-length <int>: Maximum length of the output video. Default is no limit.\n";
+    	std::cout << "-fps/--fps:                         Frames to render per second. Useful if you want to speed up or slow down the render.\n";
+    	std::cout << "-w/--prompt:                        Ask for input files instead of checking parameters. Useful for building in IDEs.\n";
+    	std::cout << "-m/--mute:                          Do not retrieve the audio data. Output video will be silent.\n";
+    	std::cout << "-nc/--no-crop:                      Do not crop to the Wii's visible area. Only recommended for debugging.\n";
+    	std::cout << "-i/--icon:                          Output the channel's icon, instead of banner.\n";
+    	std::cout << "-s/--save <int>:                    Save frames as images. Optional integer following it will be the limit, otherwise all frames will be saved.\n";
+    	std::cout << "-min/--minimum-length <int>:        Minimum length of the output video. Default is 10 seconds, 0 is the length of the audio track.\n";
+    	std::cout << "-max/--maximum-length <int>:        Maximum length of the output video. Default is no limit.\n";
+    	std::cout << "-res/--resolution-multiplier <int>: Resolution multiplier, 1 is default (1920x1080). Example: pass 1.33 for 1440p or 2 for 4k.\n";
     	std::cout << "\n";
     	std::cout << "Files are output in the working directory and bear the name of the input file (with a different file extension).\n";
     	std::cout << "\n";
@@ -418,6 +426,52 @@ int main(int argc, char** argv) {
 				}
 			} else {
 				std::cerr << "-max flag requires an integer\n";
+				return EXIT_FAILURE;
+			}
+		}
+
+		if (arg == "-fps" || arg == "--fps") {
+			if (i + 1 < argc) {
+				std::string sec_arg = argv[i + 1];
+
+				try {
+					size_t pos = 0;
+					int value = std::stoi(sec_arg, &pos);
+
+					if (pos == sec_arg.size()) { // ensure entire string is integers
+						settings.fps = value;
+					} else {
+						std::cerr << "invalid integer passed\n";
+						return EXIT_FAILURE;
+					}
+				} catch (std::exception&) {
+					std::cerr << "-fps flag requires an integer\n";
+				}
+			} else {
+				std::cerr << "-fps flag requires an integer\n";
+				return EXIT_FAILURE;
+			}
+		}
+
+		if (arg == "-res" || arg == "--resolution-multiplier") {
+			if (i + 1 < argc) {
+				std::string sec_arg = argv[i + 1];
+
+				try {
+					size_t pos = 0;
+					double value = std::stod(sec_arg, &pos);
+
+					if (pos == sec_arg.size()) { // ensure entire string is doubles
+						settings.resolution_multiplier = value;
+					} else {
+						std::cerr << "invalid double passed\n";
+						return EXIT_FAILURE;
+					}
+				} catch (std::exception&) {
+					std::cerr << "-res flag requires a numeral value\n";
+				}
+			} else {
+				std::cerr << "-res flag requires an integer\n";
 				return EXIT_FAILURE;
 			}
 		}
