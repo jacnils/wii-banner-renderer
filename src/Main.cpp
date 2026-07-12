@@ -110,7 +110,7 @@ struct CropPoints {
 	int y;
 };
 
-CropPoints GetCrop(const std::array<Point, 4>& pts) {
+constexpr CropPoints GetCrop(const std::array<Point, 4>& pts) {
 	int min_x = pts[0].x;
 	int max_x = pts[0].x;
 	int min_y = pts[0].y;
@@ -131,7 +131,7 @@ CropPoints GetCrop(const std::array<Point, 4>& pts) {
 	};
 }
 
-std::string ToFFmpegCrop(const CropPoints& c) {
+constexpr std::string ToFFmpegCrop(const CropPoints& c) {
 	return "crop=" + std::to_string(c.width) + ":" +
 					 std::to_string(c.height) + ":" +
 					 std::to_string(c.x) + ":" +
@@ -306,7 +306,21 @@ static std::string trim(const std::string& s) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> -w|-m|-nc|-min int|-max int|-s int\n";
+        std::cout << "usage: wii-banner-renderer <00000000.app/opening.bnr/*.wad> <optional arguments>\n";
+    	std::cout << "-w/--prompt:                 Ask for input files instead of checking parameters. Useful for building in IDEs.\n";
+    	std::cout << "-m/--mute:                   Do not retrieve the audio data. Output video will be silent.\n";
+    	std::cout << "-nc/--no-crop:               Do not crop to the Wii's visible area. Only recommended for debugging.\n";
+    	std::cout << "-i/--icon:                   Output the channel's icon, instead of banner.\n";
+    	std::cout << "-s/--save <int>:             Save frames as images. Optional integer following it will be the limit, otherwise all frames will be saved.\n";
+    	std::cout << "-min/--minimum-length <int>: Minimum length of the output video. Default is 10 seconds, 0 is the length of the audio track.\n";
+    	std::cout << "-max/--maximum-length <int>: Maximum length of the output video. Default is no limit.\n";
+    	std::cout << "\n";
+    	std::cout << "Files are output in the working directory and bear the name of the input file (with a different file extension).\n";
+    	std::cout << "\n";
+    	std::cout << "Wii Banner Renderer by Forwarder Factory, continuation of wii-banner-player by Wii Banner Player Team.\n";
+    	std::cout << "https://github.com/ForwarderFactory/wii-banner-renderer\n";
+    	std::cout << "https://code.google.com/archive/p/wii-banner-player/\n";
+    	std::cout << "We thank the original authors for all of their hard work.\n";
         return EXIT_FAILURE;
     }
 
@@ -316,7 +330,7 @@ int main(int argc, char** argv) {
 	for (int i = 1; i < argc; i++) {
 		std::string arg = argv[i];
 
-		if (arg == "-w") {
+		if (arg == "-w" || arg == "--prompt") {
 			std::string opening;
 			std::cout << "input file(s) (comma split): " << std::flush;
 			std::getline(std::cin, opening);
@@ -330,19 +344,19 @@ int main(int argc, char** argv) {
 					openings.emplace_back(item);
 			}
 		}
-		if (arg == "-m") {
+		if (arg == "-m" || arg == "--mute") {
 			// mute
 			settings.no_audio = true;
 		}
-		if (arg == "-nc") {
+		if (arg == "-nc" || arg == "--no-crop") {
 			// no crop
 			settings.no_crop = true;
 		}
-		if (arg == "-i") {
+		if (arg == "-i" || arg == "--icon") {
 			settings.icon = true;
 		}
 
-		if (arg == "-s") {
+		if (arg == "-s" || arg == "--save") {
 			settings.save_frames = true;
 
 			if (i + 1 < argc) {
@@ -362,7 +376,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		if (arg == "-min") {
+		if (arg == "-min" || arg == "--minimum-length") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
@@ -385,7 +399,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		if (arg == "-max") {
+		if (arg == "-max" || arg == "--maximum-length") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
