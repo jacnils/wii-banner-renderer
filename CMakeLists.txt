@@ -100,12 +100,15 @@ endif()
 if (UNIX)
     find_library(EGL_LIBRARY NAMES EGL REQUIRED)
 
+    find_package(GLEW REQUIRED)
+
     target_link_libraries(wii-banner-renderer
         PRIVATE
             OpenGL::GL
             ${EGL_LIBRARY}
             OpenSSL::SSL
             OpenSSL::Crypto
+	    GLEW::GLEW
     )
 
 endif()
