@@ -79,7 +79,9 @@ struct ProcPtr {
 			throw std::runtime_error{"failed to popen()"};
 		}
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 		_setmode(_fileno(ptr), _O_BINARY);
+#endif
 
 	}
 	~ProcPtr() {
@@ -190,7 +192,7 @@ int process(const std::string& input_opening, Settings settings = {}) {
     WiiBanner::Banner banner(opening);
 
 	if (settings.icon) {
-		banner.LoadIconA();
+		banner.LoadIcon();
 		settings.no_audio = true; // im torn about this one
 	} else {
 		banner.LoadBanner();

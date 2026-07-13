@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstdint>
+#include <cstring>
 
 #include <Wad.h>
 
