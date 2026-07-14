@@ -110,5 +110,6 @@ if (UNIX)
             OpenSSL::Crypto
 	    GLEW::GLEW
     )
-
 endif()
+
+install(TARGETS wii-banner-renderer DESTINATION bin)
