@@ -210,7 +210,7 @@ int process(const Render& input_opening, Settings settings = {}) {
 
 	std::filesystem::path tmp{base_filename};
 	if (!std::filesystem::is_directory(tmp.parent_path()) && tmp.parent_path().empty() == false) {
-		std::filesystem::create_directory(tmp.parent_path());
+		std::filesystem::create_directories(tmp.parent_path());
 
 		if (!std::filesystem::is_directory(tmp.parent_path())) {
 			std::cerr << "Failed to create directory: " << tmp.parent_path().string() << "\n";
@@ -220,7 +220,7 @@ int process(const Render& input_opening, Settings settings = {}) {
 
     Renderer renderer(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier), static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier));
 
-    WiiBanner::Banner banner(opening);
+    WiiBanner::Banner banner(opening.string());
 
 	if (settings.icon) {
 		banner.LoadIcon();
@@ -425,23 +425,17 @@ int main(int argc, char** argv) {
 				if (!item.empty())
 					openings.emplace_back(Render{.input = item});
 			}
-		}
-		if (arg == "-m" || arg == "--mute") {
+		} else if (arg == "-m" || arg == "--mute") {
 			// mute
 			settings.no_audio = true;
-		}
-		if (arg == "-nc" || arg == "--no-crop") {
+		} else if (arg == "-nc" || arg == "--no-crop") {
 			// no crop
 			settings.no_crop = true;
-		}
-		if (arg == "-i" || arg == "--icon") {
+		} else if (arg == "-i" || arg == "--icon") {
 			settings.icon = true;
-		}
-		if (arg == "-webm" || arg == "--webm") {
+		} else if (arg == "-webm" || arg == "--webm") {
 			settings.webm = true;
-		}
-
-		if (arg == "-s" || arg == "--save") {
+		} else if (arg == "-s" || arg == "--save") {
 			settings.save_frames = true;
 
 			if (i + 1 < argc) {
@@ -459,9 +453,7 @@ int main(int argc, char** argv) {
 					continue;
 				}
 			}
-		}
-
-		if (arg == "-min" || arg == "--minimum-length") {
+		} else if (arg == "-min" || arg == "--minimum-length") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
@@ -482,9 +474,7 @@ int main(int argc, char** argv) {
 				std::cerr << "-min flag requires an integer\n";
 				return EXIT_FAILURE;
 			}
-		}
-
-		if (arg == "-max" || arg == "--maximum-length") {
+		} else if (arg == "-max" || arg == "--maximum-length") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
@@ -505,9 +495,7 @@ int main(int argc, char** argv) {
 				std::cerr << "-max flag requires an integer\n";
 				return EXIT_FAILURE;
 			}
-		}
-
-		if (arg == "-fps" || arg == "--fps") {
+		} else if (arg == "-fps" || arg == "--fps") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
@@ -528,9 +516,7 @@ int main(int argc, char** argv) {
 				std::cerr << "-fps flag requires an integer\n";
 				return EXIT_FAILURE;
 			}
-		}
-
-		if (arg == "-res" || arg == "--resolution-multiplier") {
+		} else if (arg == "-res" || arg == "--resolution-multiplier") {
 			if (i + 1 < argc) {
 				std::string sec_arg = argv[i + 1];
 
@@ -551,9 +537,7 @@ int main(int argc, char** argv) {
 				std::cerr << "-res flag requires an integer\n";
 				return EXIT_FAILURE;
 			}
-		}
-
-		if (arg == "-o") {
+		} else if (arg == "-o") {
 			if (i + 1 < argc) {
 				if (openings.empty()) {
 					std::cerr << "Error: -o used before any input file\n";
@@ -565,11 +549,9 @@ int main(int argc, char** argv) {
 				std::cerr << "Error: -o requires a path\n";
 				return 1;
 			}
-		}
-		else if (std::filesystem::is_regular_file(arg)) {
+		} else if (std::filesystem::is_regular_file(arg)) {
 			openings.push_back({arg, {}});
-		}
-		else {
+		} else {
 			std::cerr << "Warning: ignoring unknown argument: " << arg << "\n";
 		}
 	}
