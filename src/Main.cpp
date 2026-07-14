@@ -51,6 +51,7 @@ struct Settings {
 	bool no_crop = false; // no crop, for debugging
 	bool icon = false; // icon, self explanatory
 	double resolution_multiplier = 1; // resolution multiplier
+	bool webm = false; // output to webm
 
 	void print_settings() const {
 		std::cout << "FPS: " << fps << "\n";
@@ -65,9 +66,14 @@ struct Settings {
 	}
 };
 
+struct Render {
+	std::filesystem::path input;
+	std::filesystem::path output;
+};
+
 // wrapper for opening processes
 struct ProcPtr {
-	ProcPtr(const std::string& params, const std::string& mode = "w") {
+	ProcPtr(const std::string& params, const std::string& mode = "w", bool print = true) {
 		ptr =
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 		_popen(params.c_str(), mode.c_str());
@@ -79,18 +85,24 @@ struct ProcPtr {
 			throw std::runtime_error{"failed to popen()"};
 		}
 
+		std::cout << "Command: " << params << "\n";
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 		_setmode(_fileno(ptr), _O_BINARY);
 #endif
 
 	}
-	~ProcPtr() {
+	void close() {
 		if (ptr)
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 			_pclose(ptr);
 #else
-				pclose(ptr);
+			pclose(ptr);
 #endif
+		ptr = nullptr;
+	}
+	~ProcPtr() {
+		close();
 	}
 
 	[[nodiscard]] FILE* get() const {
@@ -145,15 +157,15 @@ constexpr std::string ToFFmpegCrop(const CropPoints& c) {
 					 std::to_string(c.y);
 }
 
-int process(const std::string& input_opening, Settings settings = {}) {
-	std::string opening = input_opening;
+int process(const Render& input_opening, Settings settings = {}) {
+	std::filesystem::path opening = input_opening.input;
 
 	std::cout << "Processing: " << opening << "\n";
 
 	if (std::filesystem::path(opening).extension() == ".wad") {
 		std::ifstream in(opening, std::ios::binary);
 		if (!in) {
-			std::cerr << "Input file does not exist or cannot be read: " << input_opening << "\n";
+			std::cerr << "Input file does not exist or cannot be read: " << input_opening.input << "\n";
 			return EXIT_FAILURE;
 		}
 		extract_wad(in, "tmp");
@@ -181,10 +193,29 @@ int process(const std::string& input_opening, Settings settings = {}) {
 		}
 	}
 
-	std::string base_filename = std::filesystem::path(input_opening).filename().string();
-	auto ext = base_filename.find_last_of('.');
-	if (ext != std::string::npos) {
-		base_filename = base_filename.substr(0, ext);
+	std::string base_filename = input_opening.output.string();
+	if (input_opening.output.empty()) {
+		base_filename = input_opening.input.filename().string();
+
+		auto ext = base_filename.find_last_of('.');
+		if (ext != std::string::npos) {
+			base_filename = base_filename.substr(0, ext);
+		}
+
+		if (settings.webm)
+			base_filename += ".webm";
+		else
+			base_filename += ".mp4";
+	}
+
+	std::filesystem::path tmp{base_filename};
+	if (!std::filesystem::is_directory(tmp.parent_path()) && tmp.parent_path().empty() == false) {
+		std::filesystem::create_directory(tmp.parent_path());
+
+		if (!std::filesystem::is_directory(tmp.parent_path())) {
+			std::cerr << "Failed to create directory: " << tmp.parent_path().string() << "\n";
+			return EXIT_FAILURE;
+		}
 	}
 
     Renderer renderer(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier), static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier));
@@ -260,19 +291,52 @@ int process(const std::string& input_opening, Settings settings = {}) {
 		crop += ",scale=trunc(iw/2)*2:trunc(ih/2)*2\" ";
 	}
 
+	std::string output_format;
+
+	if (settings.webm)
+	{
+		output_format =
+			"-c:v libvpx-vp9 "
+			"-pix_fmt yuv420p "
+			"-b:v 0 "
+			"-crf 30 "
+			"-g " + std::to_string(settings.fps) + " "
+			"-c:a libopus "
+		    "-cluster_time_limit 1000 "
+			"-f webm "
+			"-shortest "
+			"\"" + base_filename + "\"";
+	}
+	else
+	{
+		output_format =
+			"-c:v libx264 "
+			"-pix_fmt yuv420p "
+			"-movflags +faststart "
+			"-profile:v baseline "
+			"-level 3.0 "
+			"-g " + std::to_string(settings.fps) + " "
+			"-c:a aac "
+			"-f mp4 "
+			"-shortest "
+			"\"" + base_filename + "\"";
+	}
+
+
 	ProcPtr ffmpeg{
 		"ffmpeg -y "
-	"-f rawvideo "
-	"-loglevel error "
-	"-pixel_format rgba "
-	//"-video_size VIDEO_WIDTHxVIDEO_HEIGHT "
-	"-video_size " + std::to_string(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier)) + "x" + std::to_string(static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier)) + " "
-	"-framerate " + std::to_string(settings.fps) + " "
-	"-i - " + audio_param + "-t " + std::to_string(runtime) + " " + crop +
-	"-c:v libx264 "
-	"-pix_fmt yuv420p "
-	"-c:a aac "
-	"\"" + base_filename + ".mp4" + "\"", "w"};
+		"-f rawvideo "
+		"-loglevel error "
+		"-pixel_format rgba "
+		"-video_size " + std::to_string(static_cast<int>(VIDEO_WIDTH * settings.resolution_multiplier)) + "x" +
+			std::to_string(static_cast<int>(VIDEO_HEIGHT * settings.resolution_multiplier)) + " "
+		"-framerate " + std::to_string(settings.fps) + " "
+		"-i - " + audio_param +
+		"-map 0:v:0 -map 1:a:0 "
+		"-t " + std::to_string(runtime) + " " + crop +
+		output_format,
+		"w"
+	};
 
     for (int i = 0; i < settings.fps * runtime; i++) {
     	renderer.BeginFrame();
@@ -290,13 +354,19 @@ int process(const std::string& input_opening, Settings settings = {}) {
     	layout->AdvanceFrame();
     }
 
+	ffmpeg.close();
+
     banner.UnloadBanner();
 
+	// clean temp files and directories TODO: dont write wav to disk at all
 	if (std::filesystem::is_directory("tmp")) {
 		std::filesystem::remove_all("tmp");
 	}
+	if (!settings.no_audio && std::filesystem::is_regular_file(base_filename + ".wav")) {
+		std::filesystem::remove(base_filename + ".wav");
+	}
 
-	std::cout << "Processed " << input_opening << "\n";
+	std::cout << "Processed " << input_opening.input << "\n";
 
     return 0;
 }
@@ -324,8 +394,10 @@ int main(int argc, char** argv) {
     	std::cout << "-min/--minimum-length <int>:        Minimum length of the output video. Default is 10 seconds, 0 is the length of the audio track.\n";
     	std::cout << "-max/--maximum-length <int>:        Maximum length of the output video. Default is no limit.\n";
     	std::cout << "-res/--resolution-multiplier <int>: Resolution multiplier, 1 is default (1920x1080). Example: pass 1.33 for 1440p or 2 for 4k.\n";
+    	std::cout << "-webm/--webm:                       Output in .webm format (VP9)\n";
     	std::cout << "\n";
-    	std::cout << "Files are output in the working directory and bear the name of the input file (with a different file extension).\n";
+    	std::cout << "Files are output in the working directory and bear the name of the input file (with a different file extension) by default.\n";
+    	std::cout << "You can pass in -o <path> after the input file to specify an output path.\n";
     	std::cout << "\n";
     	std::cout << "Wii Banner Renderer by Forwarder Factory, continuation of wii-banner-player by Wii Banner Player Team.\n";
     	std::cout << "https://github.com/ForwarderFactory/wii-banner-renderer\n";
@@ -335,7 +407,7 @@ int main(int argc, char** argv) {
     }
 
 	Settings settings{};
-	std::vector<std::string> openings;
+	std::vector<Render> openings;
 
 	for (int i = 1; i < argc; i++) {
 		std::string arg = argv[i];
@@ -351,7 +423,7 @@ int main(int argc, char** argv) {
 			while (std::getline(ss, item, ',')) {
 				item = trim(item);
 				if (!item.empty())
-					openings.emplace_back(item);
+					openings.emplace_back(Render{.input = item});
 			}
 		}
 		if (arg == "-m" || arg == "--mute") {
@@ -364,6 +436,9 @@ int main(int argc, char** argv) {
 		}
 		if (arg == "-i" || arg == "--icon") {
 			settings.icon = true;
+		}
+		if (arg == "-webm" || arg == "--webm") {
+			settings.webm = true;
 		}
 
 		if (arg == "-s" || arg == "--save") {
@@ -478,9 +553,30 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		if (std::filesystem::is_regular_file(arg)) {
-			openings.emplace_back(arg);
+		if (arg == "-o") {
+			if (i + 1 < argc) {
+				if (openings.empty()) {
+					std::cerr << "Error: -o used before any input file\n";
+					return 1;
+				}
+
+				openings.back().output = argv[++i];
+			} else {
+				std::cerr << "Error: -o requires a path\n";
+				return 1;
+			}
 		}
+		else if (std::filesystem::is_regular_file(arg)) {
+			openings.push_back({arg, {}});
+		}
+		else {
+			std::cerr << "Warning: ignoring unknown argument: " << arg << "\n";
+		}
+	}
+
+	if (openings.empty()) {
+		std::cerr << "No files specified.\n";
+		return EXIT_FAILURE;
 	}
 
 	std::cout << "Settings:\n";

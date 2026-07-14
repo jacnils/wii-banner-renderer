@@ -259,6 +259,8 @@ void Renderer::EndFrame()
 {
     glFinish();
 
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
     glReadPixels(
         0,
         0,
@@ -300,8 +302,7 @@ bool Renderer::SavePNG(const std::string& path, int width, int height)
     return true;
 }
 
-void Renderer::ReadPixelsTo(FILE* output)
-{
+void Renderer::ReadPixelsTo(FILE* output) {
     const int channels = 4;
     const int rowSize = m_width * channels;
 
